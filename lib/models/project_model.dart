@@ -38,15 +38,16 @@ class ProjectModel {
   final DateTime startDate;
   final DateTime? endDate;
   final String schoolId;
-  final String schoolName; // для отображения без доп. запроса
+  final String schoolName;
   final String supervisorId;
-  final String supervisorName; // для отображения
+  final String supervisorName;
   final List<ProjectParticipant> participants;
+  // Список id участников — для быстрого поиска в Firestore
+  final List<String> participantIds;
   final String results;
   final String awards;
   final DateTime createdAt;
   final DateTime updatedAt;
-  // Файлы загружаются отдельным запросом
   List<ProjectFileModel> files;
 
   ProjectModel({
@@ -63,6 +64,7 @@ class ProjectModel {
     required this.supervisorId,
     required this.supervisorName,
     required this.participants,
+    required this.participantIds,
     required this.results,
     required this.awards,
     required this.createdAt,
@@ -71,12 +73,18 @@ class ProjectModel {
   });
 
   factory ProjectModel.fromMap(Map<String, dynamic> map, String id) {
-    // Парсим список участников
+    // Парсим участников
     List<ProjectParticipant> participants = [];
     if (map['participants'] != null) {
-      for (var p in map['participants']) {
+      for (var p in (map['participants'] as List)) {
         participants.add(ProjectParticipant.fromMap(p));
       }
+    }
+
+    // Парсим список id участников
+    List<String> participantIds = [];
+    if (map['participantIds'] != null) {
+      participantIds = List<String>.from(map['participantIds']);
     }
 
     return ProjectModel(
@@ -97,6 +105,7 @@ class ProjectModel {
       supervisorId: map['supervisorId'] ?? '',
       supervisorName: map['supervisorName'] ?? '',
       participants: participants,
+      participantIds: participantIds,
       results: map['results'] ?? '',
       awards: map['awards'] ?? '',
       createdAt: map['createdAt'] != null
@@ -122,6 +131,7 @@ class ProjectModel {
       'supervisorId': supervisorId,
       'supervisorName': supervisorName,
       'participants': participants.map((p) => p.toMap()).toList(),
+      'participantIds': participantIds,
       'results': results,
       'awards': awards,
       'createdAt': createdAt.toIso8601String(),
