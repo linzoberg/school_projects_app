@@ -38,3 +38,20 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+// Автоматически вырезаем сломанный старый класс из автосгенерированного файла перед компиляцией
+tasks.withType<JavaCompile> {
+    doFirst {
+        val registrantFile = file("${projectDir}/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java")
+        if (registrantFile.exists()) {
+            var text = registrantFile.readText()
+            if (text.contains("com.mr.flutter.plugin.filepicker.FilePickerPlugin")) {
+                // Вырезаем весь блок try-catch, который вызывает ошибку
+                val regex = """try\s*\{\s*flutterEngine\.getPlugins\(\)\.add\(new\s+com\.mr\.flutter\.plugin\.filepicker\.FilePickerPlugin\(\)\);\s*\}\s*catch\s*\(Exception\s+e\)\s*\{\s*Log\.e\([^\)]+\);\s*\}""".toRegex()
+                text = text.replace(regex, "")
+                registrantFile.writeText(text)
+                logger.lifecycle("Successfully patched GeneratedPluginRegistrant.java for file_picker 11.x")
+            }
+        }
+    }
+}
