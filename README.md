@@ -1,17 +1,17 @@
-# school_projects_app
+# ПроектУМ (School Projects App)
 
-A new Flutter project.
+Мобильное приложение для управления проектами школьников.
 
-## Getting Started
+Основная цель приложения — предоставить удобный инструмент для организации проектной деятельности учащихся, планирования задач и отслеживания прогресса, упростить взаимодействие в рамках совместной работы и помочь грамотно распределять время.
 
-This project is a starting point for a Flutter application.
+### Ключевые возможности (в разработке)
+* Создание и ведение учебных проектов.
+* Распределение задач внутри команды и контроль дедлайнов.
+* Мониторинг статуса выполнения задач (To Do, In Progress, Done).
+* Интуитивно понятный мобильный интерфейс.
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### Технологии и инструменты
+* **Фреймворк:** Flutter
+* **Язык программирования:** Dart
+* **Среда разработки:** Android Studio
+* **Целевые платформы:** Android, iOS
