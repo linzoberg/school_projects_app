@@ -5,6 +5,7 @@ import '../../app_state.dart';
 import '../../models/project_model.dart';
 import '../../services/project_service.dart';
 import '../../utils/constants.dart';
+import '../../widgets/project_files_widget.dart';
 import 'project_form_screen.dart';
 
 class ProjectDetailScreen extends StatefulWidget {
@@ -21,12 +22,17 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   ProjectModel? _project;
   bool _isLoading = true;
 
+  final _dateFormat = DateFormat('dd.MM.yyyy');
+
   @override
   void initState() {
     super.initState();
     _loadProject();
   }
 
+  // -------------------------------------------------------
+  // Загрузка проекта
+  // -------------------------------------------------------
   Future<void> _loadProject() async {
     setState(() => _isLoading = true);
     final project = await _projectService.getProjectById(widget.projectId);
@@ -36,9 +42,12 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     });
   }
 
+  // -------------------------------------------------------
   // Изменить статус проекта
+  // -------------------------------------------------------
   void _changeStatus() {
     if (_project == null) return;
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -46,20 +55,36 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
       ),
       builder: (context) {
         return Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Изменить статус',
-                style: TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold),
+              // Шапка
+              Row(
+                children: [
+                  const Text(
+                    'Изменить статус',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              ...AppConstants.statusNames.entries.map((e) {
-                final isSelected = e.key == _project!.status;
+              const Divider(),
+              const SizedBox(height: 8),
+
+              // Список статусов
+              ...AppConstants.statusNames.entries.map((entry) {
+                final isSelected = entry.key == _project!.status;
                 return ListTile(
+                  contentPadding: EdgeInsets.zero,
                   leading: Icon(
                     isSelected
                         ? Icons.radio_button_checked
@@ -68,12 +93,22 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                         ? const Color(0xFF1565C0)
                         : Colors.grey,
                   ),
-                  title: Text(e.value),
+                  title: Text(
+                    entry.value,
+                    style: TextStyle(
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: isSelected
+                          ? const Color(0xFF1565C0)
+                          : Colors.black87,
+                    ),
+                  ),
                   onTap: () async {
                     Navigator.pop(context);
                     await _projectService.updateProjectStatus(
                       _project!.id,
-                      e.key,
+                      entry.key,
                     );
                     _loadProject();
                   },
@@ -86,14 +121,18 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     );
   }
 
+  // -------------------------------------------------------
   // Удалить проект
+  // -------------------------------------------------------
   void _deleteProject() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Удалить проект?'),
         content: const Text(
-            'Это действие нельзя отменить. Проект будет удалён безвозвратно.'),
+          'Это действие нельзя отменить.\n'
+              'Проект и все связанные данные будут удалены.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -101,9 +140,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(context); // закрываем диалог
               await _projectService.deleteProject(_project!.id);
-              if (mounted) Navigator.pop(context);
+              if (mounted) Navigator.pop(context); // возврат в каталог
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Удалить'),
@@ -113,48 +152,74 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     );
   }
 
-  // Цвет статуса
+  // -------------------------------------------------------
+  // Цвет бейджа статуса
+  // -------------------------------------------------------
   Color _statusColor(String status) {
     switch (status) {
-      case 'idea': return Colors.grey;
-      case 'in_progress': return Colors.blue;
-      case 'completed': return Colors.green;
-      case 'on_contest': return Colors.orange;
-      case 'archived': return Colors.brown;
-      default: return Colors.grey;
+      case AppConstants.statusIdea:
+        return Colors.grey;
+      case AppConstants.statusInProgress:
+        return Colors.blue;
+      case AppConstants.statusCompleted:
+        return Colors.green;
+      case AppConstants.statusOnContest:
+        return Colors.orange;
+      case AppConstants.statusArchived:
+        return Colors.brown;
+      default:
+        return Colors.grey;
     }
   }
 
+  // -------------------------------------------------------
+  // BUILD
+  // -------------------------------------------------------
   @override
   Widget build(BuildContext context) {
-    final currentUser = context.read<AppState>().currentUser;
-    final isAdminOrTeacher = currentUser?.role == 'admin' ||
-        currentUser?.role == 'teacher';
+    final appState = context.read<AppState>();
+    final currentUser = appState.currentUser;
+    final isAdminOrTeacher =
+        currentUser?.role == AppConstants.roleAdmin ||
+            currentUser?.role == AppConstants.roleTeacher;
 
+    // Экран загрузки
     if (_isLoading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
+    // Проект не найден
     if (_project == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Проект')),
-        body: const Center(child: Text('Проект не найден')),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.grey),
+              SizedBox(height: 16),
+              Text(
+                'Проект не найден',
+                style: TextStyle(fontSize: 18, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
     final p = _project!;
-    final dateFormat = DateFormat('dd.MM.yyyy');
     final statusColor = _statusColor(p.status);
-    final statusName =
-        AppConstants.statusNames[p.status] ?? p.status;
+    final statusName = AppConstants.statusNames[p.status] ?? p.status;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Карточка проекта'),
         actions: [
-          if (isAdminOrTeacher) ...[
+          // Редактировать — только для admin и teacher
+          if (isAdminOrTeacher)
             IconButton(
               icon: const Icon(Icons.edit_outlined),
               tooltip: 'Редактировать',
@@ -168,12 +233,13 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 _loadProject();
               },
             ),
+          // Удалить — только для admin и teacher
+          if (isAdminOrTeacher)
             IconButton(
               icon: const Icon(Icons.delete_outline),
               tooltip: 'Удалить',
               onPressed: _deleteProject,
             ),
-          ],
         ],
       ),
       body: RefreshIndicator(
@@ -184,19 +250,25 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Статус + направление
+
+              // ── СТАТУС + НАПРАВЛЕНИЕ ─────────────────────
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  // Бейдж статуса — кликабельный для admin/teacher
                   GestureDetector(
                     onTap: isAdminOrTeacher ? _changeStatus : null,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(16),
+                        color: statusColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                            color: statusColor.withOpacity(0.5)),
+                          color: statusColor.withOpacity(0.4),
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -206,37 +278,45 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                             style: TextStyle(
                               color: statusColor,
                               fontWeight: FontWeight.w600,
+                              fontSize: 13,
                             ),
                           ),
                           if (isAdminOrTeacher) ...[
-                            const SizedBox(width: 4),
-                            Icon(Icons.arrow_drop_down,
-                                color: statusColor, size: 18),
+                            const SizedBox(width: 2),
+                            Icon(
+                              Icons.arrow_drop_down,
+                              color: statusColor,
+                              size: 18,
+                            ),
                           ],
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
+                  // Направление
                   Expanded(
                     child: Text(
                       p.direction,
                       style: const TextStyle(
                         color: Color(0xFF1565C0),
                         fontWeight: FontWeight.w500,
+                        fontSize: 14,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-              // Название
+              // ── НАЗВАНИЕ ─────────────────────────────────
               Text(
                 p.title,
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
+                  height: 1.3,
                 ),
               ),
               const SizedBox(height: 8),
@@ -246,115 +326,220 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 Text(
                   p.shortDescription,
                   style: const TextStyle(
-                      fontSize: 15, color: Colors.black87),
+                    fontSize: 15,
+                    color: Colors.black87,
+                    height: 1.4,
+                  ),
                 ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
-              // Блок информации
+              // ── ИНФОРМАЦИОННЫЙ БЛОК ───────────────────────
               _infoCard([
-                _infoRow(Icons.school_outlined, 'Организация',
-                    p.schoolName.isEmpty ? 'Не указана' : p.schoolName),
-                _infoRow(Icons.person_outlined, 'Руководитель',
-                    p.supervisorName.isEmpty
-                        ? 'Не указан'
-                        : p.supervisorName),
+                _infoRow(
+                  Icons.school_outlined,
+                  'Организация',
+                  p.schoolName.isNotEmpty ? p.schoolName : 'Не указана',
+                ),
+                _dividerThin(),
+                _infoRow(
+                  Icons.person_outlined,
+                  'Руководитель',
+                  p.supervisorName.isNotEmpty
+                      ? p.supervisorName
+                      : 'Не указан',
+                ),
+                _dividerThin(),
                 _infoRow(
                   Icons.calendar_today_outlined,
-                  'Начало работы',
-                  dateFormat.format(p.startDate),
+                  'Начало',
+                  _dateFormat.format(p.startDate),
                 ),
-                if (p.endDate != null)
+                if (p.endDate != null) ...[
+                  _dividerThin(),
                   _infoRow(
                     Icons.event_outlined,
-                    'Дата завершения',
-                    dateFormat.format(p.endDate!),
+                    'Завершение',
+                    _dateFormat.format(p.endDate!),
                   ),
+                ],
               ]),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
-              // Полное описание
+              // ── ПОЛНОЕ ОПИСАНИЕ ───────────────────────────
               if (p.fullDescription.isNotEmpty) ...[
                 _sectionTitle('Описание проекта'),
                 const SizedBox(height: 8),
-                Text(p.fullDescription,
-                    style: const TextStyle(fontSize: 14, height: 1.5)),
-                const SizedBox(height: 16),
+                Text(
+                  p.fullDescription,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.6,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 20),
               ],
 
-              // Участники
-              _sectionTitle(
-                  'Участники (${p.participants.length})'),
+              // ── УЧАСТНИКИ ─────────────────────────────────
+              _sectionTitle('Участники (${p.participants.length})'),
               const SizedBox(height: 8),
               if (p.participants.isEmpty)
-                const Text('Участники не указаны',
-                    style: TextStyle(color: Colors.grey))
+                const Text(
+                  'Участники не указаны',
+                  style: TextStyle(color: Colors.grey),
+                )
               else
-                ...p.participants.map((participant) {
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(
-                      backgroundColor:
-                      const Color(0xFF1565C0).withOpacity(0.1),
-                      child: Text(
-                        participant.displayName.isNotEmpty
-                            ? participant.displayName[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(
-                            color: Color(0xFF1565C0)),
-                      ),
-                    ),
-                    title: Text(participant.displayName),
-                    subtitle: Text(
-                      participant.role == 'author'
-                          ? 'Автор'
-                          : 'Участник',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  );
-                }),
-              const SizedBox(height: 16),
+                Card(
+                  elevation: 0,
+                  color: Colors.grey.shade50,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  child: Column(
+                    children: List.generate(p.participants.length, (i) {
+                      final participant = p.participants[i];
+                      final isLast = i == p.participants.length - 1;
+                      return Column(
+                        children: [
+                          ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor:
+                              const Color(0xFF1565C0).withOpacity(0.12),
+                              child: Text(
+                                participant.displayName.isNotEmpty
+                                    ? participant.displayName[0]
+                                    .toUpperCase()
+                                    : '?',
+                                style: const TextStyle(
+                                  color: Color(0xFF1565C0),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            title: Text(participant.displayName),
+                            subtitle: Text(
+                              participant.role == 'author'
+                                  ? 'Автор проекта'
+                                  : 'Участник',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            trailing: participant.role == 'author'
+                                ? const Icon(
+                              Icons.star,
+                              color: Colors.amber,
+                              size: 20,
+                            )
+                                : null,
+                          ),
+                          if (!isLast)
+                            Divider(
+                              height: 1,
+                              indent: 16,
+                              endIndent: 16,
+                              color: Colors.grey.shade200,
+                            ),
+                        ],
+                      );
+                    }),
+                  ),
+                ),
+              const SizedBox(height: 20),
 
-              // Результаты
+              // ── РЕЗУЛЬТАТЫ ────────────────────────────────
               if (p.results.isNotEmpty) ...[
                 _sectionTitle('Результаты'),
                 const SizedBox(height: 8),
-                Text(p.results,
-                    style: const TextStyle(fontSize: 14, height: 1.5)),
-                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.green.shade100),
+                  ),
+                  child: Text(
+                    p.results,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
               ],
 
-              // Награды
+              // ── НАГРАДЫ ───────────────────────────────────
               if (p.awards.isNotEmpty) ...[
                 _sectionTitle('Достижения и награды'),
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: Colors.amber.withOpacity(0.3)),
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.amber.shade200),
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.emoji_events,
-                          color: Colors.amber),
-                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.emoji_events,
+                        color: Colors.amber,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
                       Expanded(
-                        child: Text(p.awards,
-                            style: const TextStyle(fontSize: 14)),
+                        child: Text(
+                          p.awards,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            height: 1.5,
+                            color: Colors.black87,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
               ],
 
-              // Дата создания
-              Text(
-                'Создан: ${dateFormat.format(p.createdAt)}',
-                style: const TextStyle(
-                    color: Colors.grey, fontSize: 12),
+              // ── ФАЙЛЫ ─────────────────────────────────────
+              ProjectFilesWidget(
+                projectId: p.id,
+                currentUserId: currentUser?.id ?? '',
+                canUpload: isAdminOrTeacher,
+              ),
+              const SizedBox(height: 20),
+
+              // ── МЕТАДАННЫЕ ────────────────────────────────
+              const Divider(),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Создан: ${_dateFormat.format(p.createdAt)}',
+                    style: const TextStyle(
+                      color: Colors.grey,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const Icon(Icons.update, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Обновлён: ${_dateFormat.format(p.updatedAt)}',
+                    style: const TextStyle(
+                      color: Colors.grey,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 32),
             ],
@@ -364,7 +549,10 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     );
   }
 
+  // -------------------------------------------------------
   // Вспомогательные виджеты
+  // -------------------------------------------------------
+
   Widget _sectionTitle(String text) {
     return Text(
       text,
@@ -377,45 +565,58 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   }
 
   Widget _infoCard(List<Widget> children) {
-    return Card(
-      elevation: 0,
-      color: Colors.grey.shade50,
-      shape: RoundedRectangleBorder(
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
+        border: Border.all(color: Colors.grey.shade200),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(children: children),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
       ),
     );
   }
 
   Widget _infoRow(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: Colors.grey),
-          const SizedBox(width: 8),
+          Icon(icon, size: 18, color: Colors.grey.shade600),
+          const SizedBox(width: 10),
           SizedBox(
-            width: 110,
+            width: 100,
             child: Text(
               label,
-              style: const TextStyle(
-                  color: Colors.grey, fontSize: 13),
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 13,
+              ),
             ),
           ),
           Expanded(
             child: Text(
               value,
               style: const TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w500),
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _dividerThin() {
+    return Divider(
+      height: 1,
+      color: Colors.grey.shade200,
     );
   }
 }
