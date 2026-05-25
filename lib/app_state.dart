@@ -75,6 +75,13 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  // Обновить профиль пользователя
+  Future<void> updateCurrentUserProfile(UserModel user) async {
+    await _authService.updateUserProfile(user);
+    _currentUser = user;
+    notifyListeners();
+  }
+
   // Выход
   Future<void> logout() async {
     await _authService.logout();

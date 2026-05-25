@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'app_state.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 
 void main() async {
-  // Обязательно для Firebase
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await initializeDateFormatting('ru', null);
   runApp(const MyApp());
 }
 
@@ -22,6 +24,16 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Проекты школьников',
         debugShowCheckedModeBanner: false,
+        locale: const Locale('ru'),
+        supportedLocales: const [
+          Locale('ru'),
+          Locale('en'),
+        ],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
             seedColor: const Color(0xFF1565C0),
@@ -52,14 +64,12 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
-        // Роутер: смотрим на состояние авторизации
         home: const AuthWrapper(),
       ),
     );
   }
 }
 
-// Виджет-маршрутизатор
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 
@@ -67,7 +77,6 @@ class AuthWrapper extends StatelessWidget {
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
 
-    // Пока проверяем авторизацию — показываем сплэш
     if (appState.isLoading) {
       return const Scaffold(
         body: Center(
@@ -88,7 +97,6 @@ class AuthWrapper extends StatelessWidget {
       );
     }
 
-    // Если залогинен — главный экран, иначе — вход
     if (appState.isLoggedIn) {
       return const HomeScreen();
     } else {
