@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../app_state.dart';
 import '../../models/project_model.dart';
 import '../../services/project_service.dart';
 import '../../utils/constants.dart';
@@ -15,15 +17,11 @@ class ProjectListScreen extends StatefulWidget {
 
 class _ProjectListScreenState extends State<ProjectListScreen> {
   final ProjectService _projectService = ProjectService();
-
-  // Контроллер строки поиска
   final _searchController = TextEditingController();
 
-  // Текущие фильтры
   String _selectedDirection = '';
   String _selectedStatus = '';
 
-  // Список проектов
   List<ProjectModel> _projects = [];
   bool _isLoading = true;
 
@@ -39,7 +37,6 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
     super.dispose();
   }
 
-  // Загрузка проектов с учётом фильтров
   Future<void> _loadProjects() async {
     setState(() => _isLoading = true);
     try {
@@ -62,94 +59,102 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
     }
   }
 
-  // Открыть панель фильтров
   void _showFilters() {
+    // Временные переменные для фильтров внутри диалога
+    String tempDirection = _selectedDirection;
+    String tempStatus = _selectedStatus;
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      isScrollControlled: true,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Padding(
-              padding: const EdgeInsets.all(24),
+              padding: EdgeInsets.fromLTRB(
+                24,
+                24,
+                24,
+                MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Фильтры',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  // Заголовок
+                  Row(
+                    children: [
+                      const Text(
+                        'Фильтры',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 8),
 
                   // Фильтр по направлению
-                  const Text('Направление:',
-                      style: TextStyle(fontWeight: FontWeight.w500)),
+                  const Text(
+                    'Направление:',
+                    style: TextStyle(fontWeight: FontWeight.w500),
+                  ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: _selectedDirection.isEmpty
-                        ? null
-                        : _selectedDirection,
-                    hint: const Text('Все направления'),
+                    value: tempDirection.isEmpty ? '' : tempDirection,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
+                      isDense: true,
                       contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
+                          horizontal: 12, vertical: 10),
                     ),
                     items: [
                       const DropdownMenuItem(
                         value: '',
                         child: Text('Все направления'),
                       ),
-                      ...AppConstants.directions.map((d) {
-                        return DropdownMenuItem(
-                          value: d,
-                          child: Text(d),
-                        );
-                      }),
+                      ...AppConstants.directions.map((d) =>
+                          DropdownMenuItem(value: d, child: Text(d))),
                     ],
-                    onChanged: (value) {
-                      setModalState(() =>
-                      _selectedDirection = value ?? '');
-                    },
+                    onChanged: (v) =>
+                        setModalState(() => tempDirection = v ?? ''),
                   ),
                   const SizedBox(height: 16),
 
                   // Фильтр по статусу
-                  const Text('Статус:',
-                      style: TextStyle(fontWeight: FontWeight.w500)),
+                  const Text(
+                    'Статус:',
+                    style: TextStyle(fontWeight: FontWeight.w500),
+                  ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: _selectedStatus.isEmpty
-                        ? null
-                        : _selectedStatus,
-                    hint: const Text('Все статусы'),
+                    value: tempStatus.isEmpty ? '' : tempStatus,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
+                      isDense: true,
                       contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
+                          horizontal: 12, vertical: 10),
                     ),
                     items: [
                       const DropdownMenuItem(
                         value: '',
                         child: Text('Все статусы'),
                       ),
-                      ...AppConstants.statusNames.entries.map((e) {
-                        return DropdownMenuItem(
-                          value: e.key,
-                          child: Text(e.value),
-                        );
-                      }),
+                      ...AppConstants.statusNames.entries.map((e) =>
+                          DropdownMenuItem(
+                              value: e.key, child: Text(e.value))),
                     ],
-                    onChanged: (value) {
-                      setModalState(() =>
-                      _selectedStatus = value ?? '');
-                    },
+                    onChanged: (v) =>
+                        setModalState(() => tempStatus = v ?? ''),
                   ),
                   const SizedBox(height: 24),
 
@@ -160,8 +165,8 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
                         child: OutlinedButton(
                           onPressed: () {
                             setModalState(() {
-                              _selectedDirection = '';
-                              _selectedStatus = '';
+                              tempDirection = '';
+                              tempStatus = '';
                             });
                           },
                           child: const Text('Сбросить'),
@@ -171,6 +176,10 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () {
+                            setState(() {
+                              _selectedDirection = tempDirection;
+                              _selectedStatus = tempStatus;
+                            });
                             Navigator.pop(context);
                             _loadProjects();
                           },
@@ -190,10 +199,15 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final role =
+        context.watch<AppState>().currentUser?.role ?? 'student';
+    final canCreate = role == AppConstants.roleTeacher ||
+        role == AppConstants.roleAdmin;
+
     return Scaffold(
       body: Column(
         children: [
-          // Строка поиска
+          // ── СТРОКА ПОИСКА ────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Row(
@@ -220,10 +234,14 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
                       const EdgeInsets.symmetric(vertical: 0),
                     ),
                     onSubmitted: (_) => _loadProjects(),
+                    onChanged: (v) {
+                      if (v.isEmpty) _loadProjects();
+                      setState(() {});
+                    },
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Кнопка фильтров
+                // Кнопка фильтров с индикатором
                 Badge(
                   isLabelVisible: _selectedDirection.isNotEmpty ||
                       _selectedStatus.isNotEmpty,
@@ -237,66 +255,92 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
             ),
           ),
 
-          // Активные фильтры (чипы)
-          if (_selectedDirection.isNotEmpty || _selectedStatus.isNotEmpty)
+          // ── АКТИВНЫЕ ФИЛЬТРЫ (ЧИПЫ) ──────────────────
+          if (_selectedDirection.isNotEmpty ||
+              _selectedStatus.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
               child: Row(
                 children: [
+                  const Text(
+                    'Фильтры: ',
+                    style:
+                    TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
                   if (_selectedDirection.isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        label: Text(_selectedDirection),
-                        selected: true,
-                        onSelected: (_) {
-                          setState(() => _selectedDirection = '');
-                          _loadProjects();
-                        },
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Chip(
+                        label: Text(
+                          _selectedDirection,
+                          style: const TextStyle(fontSize: 12),
+                        ),
                         deleteIcon: const Icon(Icons.close, size: 14),
                         onDeleted: () {
                           setState(() => _selectedDirection = '');
                           _loadProjects();
                         },
+                        visualDensity: VisualDensity.compact,
+                        backgroundColor:
+                        const Color(0xFF1565C0).withOpacity(0.1),
                       ),
                     ),
                   if (_selectedStatus.isNotEmpty)
-                    FilterChip(
+                    Chip(
                       label: Text(
-                          AppConstants.statusNames[_selectedStatus] ??
-                              _selectedStatus),
-                      selected: true,
-                      onSelected: (_) {
-                        setState(() => _selectedStatus = '');
-                        _loadProjects();
-                      },
+                        AppConstants.statusNames[_selectedStatus] ??
+                            _selectedStatus,
+                        style: const TextStyle(fontSize: 12),
+                      ),
                       deleteIcon: const Icon(Icons.close, size: 14),
                       onDeleted: () {
                         setState(() => _selectedStatus = '');
                         _loadProjects();
                       },
+                      visualDensity: VisualDensity.compact,
+                      backgroundColor:
+                      const Color(0xFF1565C0).withOpacity(0.1),
                     ),
                 ],
               ),
             ),
 
-          // Счётчик результатов
+          // ── СЧЁТЧИК ──────────────────────────────────
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+            padding: const EdgeInsets.fromLTRB(16, 2, 16, 4),
             child: Row(
               children: [
                 Text(
-                  'Найдено: ${_projects.length}',
+                  _isLoading
+                      ? 'Загрузка...'
+                      : 'Найдено: ${_projects.length}',
                   style: const TextStyle(
-                    color: Colors.grey,
-                    fontSize: 13,
-                  ),
+                      color: Colors.grey, fontSize: 13),
                 ),
+                const Spacer(),
+                // Кнопка обновить
+                if (!_isLoading)
+                  GestureDetector(
+                    onTap: _loadProjects,
+                    child: const Row(
+                      children: [
+                        Icon(Icons.refresh,
+                            size: 14, color: Colors.grey),
+                        SizedBox(width: 2),
+                        Text(
+                          'Обновить',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
 
-          // Список проектов
+          // ── СПИСОК ПРОЕКТОВ ───────────────────────────
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -305,30 +349,51 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.folder_open,
-                      size: 64, color: Colors.grey),
+                  Icon(Icons.folder_open,
+                      size: 64,
+                      color: Colors.grey.shade300),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Проекты не найдены',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey,
-                    ),
+                  Text(
+                    _selectedDirection.isNotEmpty ||
+                        _selectedStatus.isNotEmpty ||
+                        _searchController.text.isNotEmpty
+                        ? 'Проекты не найдены'
+                        : 'Проектов пока нет',
+                    style: const TextStyle(
+                        fontSize: 18, color: Colors.grey),
                   ),
                   const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                          const ProjectFormScreen(),
-                        ),
-                      );
-                      _loadProjects();
-                    },
-                    child: const Text('Создать первый проект'),
-                  ),
+                  if (_selectedDirection.isNotEmpty ||
+                      _selectedStatus.isNotEmpty ||
+                      _searchController.text.isNotEmpty)
+                    TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _selectedDirection = '';
+                          _selectedStatus = '';
+                          _searchController.clear();
+                        });
+                        _loadProjects();
+                      },
+                      icon: const Icon(Icons.clear_all),
+                      label: const Text('Сбросить фильтры'),
+                    )
+                  else if (canCreate)
+                    TextButton.icon(
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                            const ProjectFormScreen(),
+                          ),
+                        );
+                        _loadProjects();
+                      },
+                      icon: const Icon(Icons.add),
+                      label:
+                      const Text('Создать первый проект'),
+                    ),
                 ],
               ),
             )
@@ -358,8 +423,10 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
           ),
         ],
       ),
-      // Кнопка создания проекта
-      floatingActionButton: FloatingActionButton.extended(
+
+      // ── КНОПКА СОЗДАНИЯ (только teacher и admin) ──────
+      floatingActionButton: canCreate
+          ? FloatingActionButton.extended(
         onPressed: () async {
           await Navigator.push(
             context,
@@ -373,7 +440,8 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
         label: const Text('Новый проект'),
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
-      ),
+      )
+          : null,
     );
   }
 }

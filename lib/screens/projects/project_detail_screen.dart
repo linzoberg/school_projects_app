@@ -30,21 +30,16 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     _loadProject();
   }
 
-  // -------------------------------------------------------
-  // Загрузка проекта
-  // -------------------------------------------------------
   Future<void> _loadProject() async {
     setState(() => _isLoading = true);
-    final project = await _projectService.getProjectById(widget.projectId);
+    final project =
+    await _projectService.getProjectById(widget.projectId);
     setState(() {
       _project = project;
       _isLoading = false;
     });
   }
 
-  // -------------------------------------------------------
-  // Изменить статус проекта
-  // -------------------------------------------------------
   void _changeStatus() {
     if (_project == null) return;
 
@@ -60,15 +55,12 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Шапка
               Row(
                 children: [
                   const Text(
                     'Изменить статус',
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                        fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const Spacer(),
                   IconButton(
@@ -79,8 +71,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
               ),
               const Divider(),
               const SizedBox(height: 8),
-
-              // Список статусов
               ...AppConstants.statusNames.entries.map((entry) {
                 final isSelected = entry.key == _project!.status;
                 return ListTile(
@@ -121,9 +111,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     );
   }
 
-  // -------------------------------------------------------
-  // Удалить проект
-  // -------------------------------------------------------
   void _deleteProject() {
     showDialog(
       context: context,
@@ -140,9 +127,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context); // закрываем диалог
+              Navigator.pop(context);
               await _projectService.deleteProject(_project!.id);
-              if (mounted) Navigator.pop(context); // возврат в каталог
+              if (mounted) Navigator.pop(context);
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Удалить'),
@@ -152,9 +139,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     );
   }
 
-  // -------------------------------------------------------
-  // Цвет бейджа статуса
-  // -------------------------------------------------------
   Color _statusColor(String status) {
     switch (status) {
       case AppConstants.statusIdea:
@@ -172,25 +156,24 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     }
   }
 
-  // -------------------------------------------------------
-  // BUILD
-  // -------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     final appState = context.read<AppState>();
     final currentUser = appState.currentUser;
-    final isAdminOrTeacher =
-        currentUser?.role == AppConstants.roleAdmin ||
-            currentUser?.role == AppConstants.roleTeacher;
+    final role = currentUser?.role ?? 'student';
 
-    // Экран загрузки
+    // Права доступа
+    final canEdit = role == AppConstants.roleTeacher ||
+        role == AppConstants.roleAdmin;
+    final canDelete = role == AppConstants.roleAdmin;
+    final canUploadFiles = canEdit;
+
     if (_isLoading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
-    // Проект не найден
     if (_project == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Проект')),
@@ -212,14 +195,14 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
     final p = _project!;
     final statusColor = _statusColor(p.status);
-    final statusName = AppConstants.statusNames[p.status] ?? p.status;
+    final statusName =
+        AppConstants.statusNames[p.status] ?? p.status;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Карточка проекта'),
         actions: [
-          // Редактировать — только для admin и teacher
-          if (isAdminOrTeacher)
+          if (canEdit)
             IconButton(
               icon: const Icon(Icons.edit_outlined),
               tooltip: 'Редактировать',
@@ -233,8 +216,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 _loadProject();
               },
             ),
-          // Удалить — только для admin и teacher
-          if (isAdminOrTeacher)
+          if (canDelete)
             IconButton(
               icon: const Icon(Icons.delete_outline),
               tooltip: 'Удалить',
@@ -251,24 +233,20 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
 
-              // ── СТАТУС + НАПРАВЛЕНИЕ ─────────────────────
+              // ── СТАТУС + НАПРАВЛЕНИЕ ─────────────────
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Бейдж статуса — кликабельный для admin/teacher
                   GestureDetector(
-                    onTap: isAdminOrTeacher ? _changeStatus : null,
+                    onTap: canEdit ? _changeStatus : null,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: statusColor.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: statusColor.withOpacity(0.4),
-                        ),
+                            color: statusColor.withOpacity(0.4)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -281,20 +259,16 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                               fontSize: 13,
                             ),
                           ),
-                          if (isAdminOrTeacher) ...[
+                          if (canEdit) ...[
                             const SizedBox(width: 2),
-                            Icon(
-                              Icons.arrow_drop_down,
-                              color: statusColor,
-                              size: 18,
-                            ),
+                            Icon(Icons.arrow_drop_down,
+                                color: statusColor, size: 18),
                           ],
                         ],
                       ),
                     ),
                   ),
                   const SizedBox(width: 10),
-                  // Направление
                   Expanded(
                     child: Text(
                       p.direction,
@@ -310,7 +284,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
               ),
               const SizedBox(height: 14),
 
-              // ── НАЗВАНИЕ ─────────────────────────────────
+              // ── НАЗВАНИЕ ─────────────────────────────
               Text(
                 p.title,
                 style: const TextStyle(
@@ -321,7 +295,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
               ),
               const SizedBox(height: 8),
 
-              // Краткое описание
               if (p.shortDescription.isNotEmpty)
                 Text(
                   p.shortDescription,
@@ -333,12 +306,14 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 ),
               const SizedBox(height: 20),
 
-              // ── ИНФОРМАЦИОННЫЙ БЛОК ───────────────────────
+              // ── ИНФОРМАЦИОННЫЙ БЛОК ───────────────────
               _infoCard([
                 _infoRow(
                   Icons.school_outlined,
                   'Организация',
-                  p.schoolName.isNotEmpty ? p.schoolName : 'Не указана',
+                  p.schoolName.isNotEmpty
+                      ? p.schoolName
+                      : 'Не указана',
                 ),
                 _dividerThin(),
                 _infoRow(
@@ -365,7 +340,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
               ]),
               const SizedBox(height: 20),
 
-              // ── ПОЛНОЕ ОПИСАНИЕ ───────────────────────────
+              // ── ПОЛНОЕ ОПИСАНИЕ ───────────────────────
               if (p.fullDescription.isNotEmpty) ...[
                 _sectionTitle('Описание проекта'),
                 const SizedBox(height: 8),
@@ -380,8 +355,9 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 const SizedBox(height: 20),
               ],
 
-              // ── УЧАСТНИКИ ─────────────────────────────────
-              _sectionTitle('Участники (${p.participants.length})'),
+              // ── УЧАСТНИКИ ─────────────────────────────
+              _sectionTitle(
+                  'Участники (${p.participants.length})'),
               const SizedBox(height: 8),
               if (p.participants.isEmpty)
                 const Text(
@@ -397,15 +373,16 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                     side: BorderSide(color: Colors.grey.shade200),
                   ),
                   child: Column(
-                    children: List.generate(p.participants.length, (i) {
+                    children:
+                    List.generate(p.participants.length, (i) {
                       final participant = p.participants[i];
                       final isLast = i == p.participants.length - 1;
                       return Column(
                         children: [
                           ListTile(
                             leading: CircleAvatar(
-                              backgroundColor:
-                              const Color(0xFF1565C0).withOpacity(0.12),
+                              backgroundColor: const Color(0xFF1565C0)
+                                  .withOpacity(0.12),
                               child: Text(
                                 participant.displayName.isNotEmpty
                                     ? participant.displayName[0]
@@ -425,11 +402,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                               style: const TextStyle(fontSize: 12),
                             ),
                             trailing: participant.role == 'author'
-                                ? const Icon(
-                              Icons.star,
-                              color: Colors.amber,
-                              size: 20,
-                            )
+                                ? const Icon(Icons.star,
+                                color: Colors.amber, size: 20)
                                 : null,
                           ),
                           if (!isLast)
@@ -446,7 +420,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 ),
               const SizedBox(height: 20),
 
-              // ── РЕЗУЛЬТАТЫ ────────────────────────────────
+              // ── РЕЗУЛЬТАТЫ ────────────────────────────
               if (p.results.isNotEmpty) ...[
                 _sectionTitle('Результаты'),
                 const SizedBox(height: 8),
@@ -461,16 +435,13 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                   child: Text(
                     p.results,
                     style: const TextStyle(
-                      fontSize: 14,
-                      height: 1.5,
-                      color: Colors.black87,
-                    ),
+                        fontSize: 14, height: 1.5),
                   ),
                 ),
                 const SizedBox(height: 20),
               ],
 
-              // ── НАГРАДЫ ───────────────────────────────────
+              // ── НАГРАДЫ ───────────────────────────────
               if (p.awards.isNotEmpty) ...[
                 _sectionTitle('Достижения и награды'),
                 const SizedBox(height: 8),
@@ -485,20 +456,14 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.emoji_events,
-                        color: Colors.amber,
-                        size: 22,
-                      ),
+                      const Icon(Icons.emoji_events,
+                          color: Colors.amber, size: 22),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           p.awards,
                           style: const TextStyle(
-                            fontSize: 14,
-                            height: 1.5,
-                            color: Colors.black87,
-                          ),
+                              fontSize: 14, height: 1.5),
                         ),
                       ),
                     ],
@@ -507,37 +472,35 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 const SizedBox(height: 20),
               ],
 
-              // ── ФАЙЛЫ ─────────────────────────────────────
+              // ── ФАЙЛЫ ─────────────────────────────────
               ProjectFilesWidget(
                 projectId: p.id,
                 currentUserId: currentUser?.id ?? '',
-                canUpload: isAdminOrTeacher,
+                canUpload: canUploadFiles,
               ),
               const SizedBox(height: 20),
 
-              // ── МЕТАДАННЫЕ ────────────────────────────────
+              // ── МЕТАДАННЫЕ ────────────────────────────
               const Divider(),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                  const Icon(Icons.access_time,
+                      size: 14, color: Colors.grey),
                   const SizedBox(width: 4),
                   Text(
                     'Создан: ${_dateFormat.format(p.createdAt)}',
                     style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 12,
-                    ),
+                        color: Colors.grey, fontSize: 12),
                   ),
                   const SizedBox(width: 16),
-                  const Icon(Icons.update, size: 14, color: Colors.grey),
+                  const Icon(Icons.update,
+                      size: 14, color: Colors.grey),
                   const SizedBox(width: 4),
                   Text(
                     'Обновлён: ${_dateFormat.format(p.updatedAt)}',
                     style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 12,
-                    ),
+                        color: Colors.grey, fontSize: 12),
                   ),
                 ],
               ),
@@ -549,9 +512,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     );
   }
 
-  // -------------------------------------------------------
-  // Вспомогательные виджеты
-  // -------------------------------------------------------
+  // ── Вспомогательные виджеты ───────────────────────────
 
   Widget _sectionTitle(String text) {
     return Text(
@@ -572,7 +533,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade200),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding:
+      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: children,
@@ -593,9 +555,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             child: Text(
               label,
               style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 13,
-              ),
+                  color: Colors.grey.shade600, fontSize: 13),
             ),
           ),
           Expanded(
@@ -614,9 +574,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   }
 
   Widget _dividerThin() {
-    return Divider(
-      height: 1,
-      color: Colors.grey.shade200,
-    );
+    return Divider(height: 1, color: Colors.grey.shade200);
   }
 }
