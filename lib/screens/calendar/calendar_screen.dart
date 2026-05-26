@@ -21,17 +21,28 @@ class _CalendarScreenState extends State<CalendarScreen> {
   List<EventModel> _events = [];
   bool _isLoading = true;
 
-  late DateFormat _monthFormat;
+
   late DateFormat _dateFormat;
   late DateFormat _timeFormat;
 
   @override
   void initState() {
     super.initState();
-    _monthFormat = DateFormat('MMMM yyyy', 'ru');
+    // НЕ используем _monthFormat для заголовка — он даёт родительный падеж
     _dateFormat = DateFormat('dd.MM.yyyy');
     _timeFormat = DateFormat('dd MMMM', 'ru');
     _loadEvents();
+  }
+
+// Названия месяцев в именительном падеже
+  static const List<String> _monthNames = [
+    'ЯНВАРЬ', 'ФЕВРАЛЬ', 'МАРТ', 'АПРЕЛЬ',
+    'МАЙ', 'ИЮНЬ', 'ИЮЛЬ', 'АВГУСТ',
+    'СЕНТЯБРЬ', 'ОКТЯБРЬ', 'НОЯБРЬ', 'ДЕКАБРЬ',
+  ];
+
+  String _formatMonth(DateTime date) {
+    return '${_monthNames[date.month - 1]} ${date.year}';
   }
 
   Future<void> _loadEvents() async {
@@ -355,7 +366,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   onPressed: _previousMonth,
                 ),
                 Text(
-                  _monthFormat.format(_currentMonth).toUpperCase(),
+                  _formatMonth(_currentMonth),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,

@@ -66,11 +66,13 @@ class _HomeScreenState extends State<HomeScreen> {
             selectedIcon: Icon(Icons.calendar_today),
             label: 'Календарь',
           ),
+
           NavigationDestination(
-            icon: Icon(Icons.bar_chart_outlined),
-            selectedIcon: Icon(Icons.bar_chart),
+            icon: Icon(Icons.insert_chart_outlined),
+            selectedIcon: Icon(Icons.insert_chart),
             label: 'Отчёты',
           ),
+
           NavigationDestination(
             icon: Icon(Icons.person_outlined),
             selectedIcon: Icon(Icons.person),

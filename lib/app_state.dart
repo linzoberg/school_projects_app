@@ -12,7 +12,6 @@ class AppState extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isLoggedIn => _currentUser != null;
 
-  // Роль текущего пользователя
   String get role => _currentUser?.role ?? '';
   bool get isAdmin => role == 'admin';
   bool get isTeacher => role == 'teacher';
@@ -22,7 +21,6 @@ class AppState extends ChangeNotifier {
     _init();
   }
 
-  // Инициализация — проверяем, залогинен ли пользователь
   Future<void> _init() async {
     _isLoading = true;
     notifyListeners();
@@ -38,7 +36,9 @@ class AppState extends ChangeNotifier {
     });
   }
 
+  // -------------------------------------------------------
   // Вход
+  // -------------------------------------------------------
   Future<String?> login(String email, String password) async {
     try {
       _currentUser = await _authService.login(
@@ -46,13 +46,15 @@ class AppState extends ChangeNotifier {
         password: password,
       );
       notifyListeners();
-      return null; // null = успех
+      return null;
     } catch (e) {
-      return e.toString(); // возвращаем текст ошибки
+      return e.toString();
     }
   }
 
-  // Регистрация
+  // -------------------------------------------------------
+  // Регистрация — сразу устанавливаем пользователя
+  // -------------------------------------------------------
   Future<String?> register({
     required String email,
     required String password,
@@ -61,36 +63,49 @@ class AppState extends ChangeNotifier {
     String? schoolId,
   }) async {
     try {
-      _currentUser = await _authService.register(
+      final newUser = await _authService.register(
         email: email,
         password: password,
         displayName: displayName,
         role: role,
         schoolId: schoolId,
       );
-      notifyListeners();
+
+      if (newUser != null) {
+        // Сразу устанавливаем пользователя — не ждём слушателя
+        _currentUser = newUser;
+        _isLoading = false;
+        notifyListeners();
+      }
+
       return null; // null = успех
     } catch (e) {
       return e.toString();
     }
   }
 
-  // Обновить профиль пользователя
-  Future<void> updateCurrentUserProfile(UserModel user) async {
-    await _authService.updateUserProfile(user);
-    _currentUser = user;
-    notifyListeners();
-  }
-
+  // -------------------------------------------------------
   // Выход
+  // -------------------------------------------------------
   Future<void> logout() async {
     await _authService.logout();
     _currentUser = null;
     notifyListeners();
   }
 
-  // Обновить данные текущего пользователя
+  // -------------------------------------------------------
+  // Обновить профиль пользователя
+  // -------------------------------------------------------
   void updateCurrentUser(UserModel user) {
+    _currentUser = user;
+    notifyListeners();
+  }
+
+  // -------------------------------------------------------
+  // Обновить профиль в БД и локально
+  // -------------------------------------------------------
+  Future<void> updateCurrentUserProfile(UserModel user) async {
+    await _authService.updateUserProfile(user);
     _currentUser = user;
     notifyListeners();
   }
