@@ -87,37 +87,37 @@ class ProjectService {
   // Получить проекты конкретного пользователя
   // -------------------------------------------------------
   Future<List<ProjectModel>> getProjectsByUser(String userId) async {
-    // Проекты где пользователь — руководитель
-    final asSupervisor = await _projects
-        .where('supervisorId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .get();
+    try {
+      final List<ProjectModel> result = [];
 
-    final List<ProjectModel> result = asSupervisor.docs
-        .map((doc) => ProjectModel.fromMap(
-      doc.data() as Map<String, dynamic>,
-      doc.id,
-    ))
-        .toList();
+      // Получаем ВСЕ проекты и фильтруем локально
+      final snapshot = await _projects
+          .orderBy('createdAt', descending: true)
+          .get();
 
-    // Проекты где пользователь — участник
-    final asParticipant = await _projects
-        .where('participantIds', arrayContains: userId)
-        .orderBy('createdAt', descending: true)
-        .get();
+      for (final doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final project = ProjectModel.fromMap(data, doc.id);
 
-    for (final doc in asParticipant.docs) {
-      // Избегаем дублей
-      final project = ProjectModel.fromMap(
-        doc.data() as Map<String, dynamic>,
-        doc.id,
-      );
-      if (!result.any((p) => p.id == project.id)) {
-        result.add(project);
+        // Проверяем является ли пользователь руководителем
+        final isSupervisor = data['supervisorId'] == userId;
+
+        // Проверяем является ли пользователь участником
+        final participantIds = data['participantIds'];
+        bool isParticipant = false;
+        if (participantIds is List) {
+          isParticipant = participantIds.contains(userId);
+        }
+
+        if (isSupervisor || isParticipant) {
+          result.add(project);
+        }
       }
-    }
 
-    return result;
+      return result;
+    } catch (e) {
+      return [];
+    }
   }
 
   // -------------------------------------------------------

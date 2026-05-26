@@ -1,5 +1,5 @@
 # ПроектУМ (project PUMA)
-[![Current Version](https://img.shields.io/badge/Version-0.4.1-green)](#)
+[![Current Version](https://img.shields.io/badge/Version-0.5.1-blue)](#)
 
 Мобильное приложение для управления проектами школьников.
 

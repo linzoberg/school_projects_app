@@ -16,21 +16,21 @@ class CalendarScreen extends StatefulWidget {
 class _CalendarScreenState extends State<CalendarScreen> {
   final EventService _eventService = EventService();
 
-  // Текущий отображаемый месяц
   DateTime _currentMonth = DateTime.now();
-  // Выбранный день
   DateTime? _selectedDay;
-  // Все мероприятия текущего месяца
   List<EventModel> _events = [];
   bool _isLoading = true;
 
-  final _monthFormat = DateFormat('MMMM yyyy', 'ru');
-  final _dateFormat = DateFormat('dd.MM.yyyy');
-  final _timeFormat = DateFormat('dd MMMM', 'ru');
+  late DateFormat _monthFormat;
+  late DateFormat _dateFormat;
+  late DateFormat _timeFormat;
 
   @override
   void initState() {
     super.initState();
+    _monthFormat = DateFormat('MMMM yyyy', 'ru');
+    _dateFormat = DateFormat('dd.MM.yyyy');
+    _timeFormat = DateFormat('dd MMMM', 'ru');
     _loadEvents();
   }
 
@@ -46,7 +46,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
     });
   }
 
-  // Получить мероприятия выбранного дня
   List<EventModel> _eventsForDay(DateTime day) {
     return _events.where((e) {
       return e.eventDate.year == day.year &&
@@ -55,37 +54,39 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }).toList();
   }
 
-  // Предыдущий месяц
   void _previousMonth() {
     setState(() {
-      _currentMonth = DateTime(
-        _currentMonth.year,
-        _currentMonth.month - 1,
-      );
+      _currentMonth =
+          DateTime(_currentMonth.year, _currentMonth.month - 1);
       _selectedDay = null;
     });
     _loadEvents();
   }
 
-  // Следующий месяц
   void _nextMonth() {
     setState(() {
-      _currentMonth = DateTime(
-        _currentMonth.year,
-        _currentMonth.month + 1,
-      );
+      _currentMonth =
+          DateTime(_currentMonth.year, _currentMonth.month + 1);
       _selectedDay = null;
     });
     _loadEvents();
   }
 
-  // Показать форму добавления мероприятия
-  void _showAddEventDialog() {
+  // ── ДИАЛОГ СОЗДАНИЯ / РЕДАКТИРОВАНИЯ ──────────────────
+  void _showEventDialog({EventModel? existingEvent}) {
     final user = context.read<AppState>().currentUser;
-    final titleController = TextEditingController();
-    final descController = TextEditingController();
-    DateTime selectedDate = _selectedDay ?? DateTime.now();
-    String selectedType = AppConstants.eventTypeContest;
+    final isEditing = existingEvent != null;
+
+    final titleController = TextEditingController(
+      text: existingEvent?.title ?? '',
+    );
+    final descController = TextEditingController(
+      text: existingEvent?.description ?? '',
+    );
+    DateTime selectedDate =
+        existingEvent?.eventDate ?? (_selectedDay ?? DateTime.now());
+    String selectedType =
+        existingEvent?.type ?? AppConstants.eventTypeContest;
 
     showDialog(
       context: context,
@@ -93,80 +94,135 @@ class _CalendarScreenState extends State<CalendarScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('Новое мероприятие'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Название
-                    TextField(
-                      controller: titleController,
-                      decoration: const InputDecoration(
-                        labelText: 'Название *',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.event),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Описание
-                    TextField(
-                      controller: descController,
-                      decoration: const InputDecoration(
-                        labelText: 'Описание',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.notes),
-                      ),
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Тип мероприятия
-                    DropdownButtonFormField<String>(
-                      value: selectedType,
-                      decoration: const InputDecoration(
-                        labelText: 'Тип',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.category_outlined),
-                      ),
-                      items: AppConstants.eventTypeNames.entries
-                          .map((e) => DropdownMenuItem(
-                        value: e.key,
-                        child: Text(e.value),
-                      ))
-                          .toList(),
-                      onChanged: (v) =>
-                          setDialogState(() => selectedType = v!),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Дата
-                    InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate,
-                          firstDate: DateTime(2024),
-                          lastDate: DateTime(2030),
-                        );
-                        if (picked != null) {
-                          setDialogState(() => selectedDate = picked);
-                        }
-                      },
-                      child: InputDecorator(
+              title: Text(
+                isEditing ? 'Редактировать' : 'Новое мероприятие',
+              ),
+              // Убираем горизонтальный padding у content
+              contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Название
+                      TextField(
+                        controller: titleController,
                         decoration: const InputDecoration(
-                          labelText: 'Дата',
+                          labelText: 'Название *',
                           border: OutlineInputBorder(),
-                          prefixIcon:
-                          Icon(Icons.calendar_today_outlined),
-                        ),
-                        child: Text(
-                          _dateFormat.format(selectedDate),
-                          style: const TextStyle(fontSize: 15),
+                          isDense: true,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 10),
+
+                      // Описание
+                      TextField(
+                        controller: descController,
+                        decoration: const InputDecoration(
+                          labelText: 'Описание',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Тип — используем простой список вместо Dropdown
+                      const Text(
+                        'Тип мероприятия:',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: AppConstants.eventTypeNames.entries
+                            .map((entry) {
+                          final isSelected = selectedType == entry.key;
+                          return GestureDetector(
+                            onTap: () => setDialogState(
+                                    () => selectedType = entry.key),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? const Color(0xFF1565C0)
+                                    : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? const Color(0xFF1565C0)
+                                      : Colors.grey.shade300,
+                                ),
+                              ),
+                              child: Text(
+                                entry.value,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Colors.black87,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Дата
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate,
+                            firstDate: DateTime(2024),
+                            lastDate: DateTime(2030),
+                          );
+                          if (picked != null) {
+                            setDialogState(() => selectedDate = picked);
+                          }
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade400),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.calendar_today_outlined,
+                                size: 18,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _dateFormat.format(selectedDate),
+                                style: const TextStyle(fontSize: 15),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -177,21 +233,43 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     if (titleController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Введите название'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
                       return;
                     }
-                    final event = EventModel(
-                      id: '',
-                      title: titleController.text.trim(),
-                      description: descController.text.trim(),
-                      eventDate: selectedDate,
-                      type: selectedType,
-                      createdBy: user?.id ?? '',
-                    );
-                    await _eventService.createEvent(event);
+
+                    if (isEditing) {
+                      // Редактирование
+                      final updated = EventModel(
+                        id: existingEvent.id,
+                        title: titleController.text.trim(),
+                        description: descController.text.trim(),
+                        eventDate: selectedDate,
+                        type: selectedType,
+                        createdBy: existingEvent.createdBy,
+                      );
+                      await _eventService.updateEvent(updated);
+                    } else {
+                      // Создание
+                      final event = EventModel(
+                        id: '',
+                        title: titleController.text.trim(),
+                        description: descController.text.trim(),
+                        eventDate: selectedDate,
+                        type: selectedType,
+                        createdBy: user?.id ?? '',
+                      );
+                      await _eventService.createEvent(event);
+                    }
+
                     if (context.mounted) Navigator.pop(context);
                     _loadEvents();
                   },
-                  child: const Text('Создать'),
+                  child: Text(isEditing ? 'Сохранить' : 'Создать'),
                 ),
               ],
             );
@@ -201,7 +279,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  // Удалить мероприятие
   void _deleteEvent(EventModel event) {
     showDialog(
       context: context,
@@ -227,7 +304,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  // Цвет типа мероприятия
   Color _eventColor(String type) {
     switch (type) {
       case AppConstants.eventTypeOlympiad:
@@ -243,7 +319,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  // Иконка типа мероприятия
   IconData _eventIcon(String type) {
     switch (type) {
       case AppConstants.eventTypeOlympiad:
@@ -267,7 +342,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return Scaffold(
       body: Column(
         children: [
-          // ── ЗАГОЛОВОК МЕСЯЦА ─────────────────────────
+          // Заголовок месяца
           Container(
             color: const Color(0xFF1565C0),
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
@@ -297,7 +372,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
           ),
 
-          // ── СЕТКА КАЛЕНДАРЯ ──────────────────────────
+          // Сетка календаря
           Container(
             color: const Color(0xFF1565C0).withOpacity(0.05),
             child: Column(
@@ -307,8 +382,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 8, vertical: 6),
                   child: Row(
-                    children: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
-                        .map((day) => Expanded(
+                    children: [
+                      'Пн','Вт','Ср','Чт','Пт','Сб','Вс'
+                    ].map((day) => Expanded(
                       child: Center(
                         child: Text(
                           day,
@@ -321,12 +397,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           ),
                         ),
                       ),
-                    ))
-                        .toList(),
+                    )).toList(),
                   ),
                 ),
-
-                // Дни месяца
                 _buildCalendarGrid(),
               ],
             ),
@@ -334,17 +407,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
           const Divider(height: 1),
 
-          // ── СПИСОК МЕРОПРИЯТИЙ ───────────────────────
+          // Список мероприятий
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _buildEventsList(),
+                : _buildEventsList(isAdminOrTeacher),
           ),
         ],
       ),
       floatingActionButton: isAdminOrTeacher
           ? FloatingActionButton.extended(
-        onPressed: _showAddEventDialog,
+        onPressed: () => _showEventDialog(),
         icon: const Icon(Icons.add),
         label: const Text('Мероприятие'),
         backgroundColor: const Color(0xFF1565C0),
@@ -354,10 +427,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  // Построить сетку дней
   Widget _buildCalendarGrid() {
-    final firstDay = DateTime(_currentMonth.year, _currentMonth.month, 1);
-    // Сдвиг: понедельник = 0
+    final firstDay =
+    DateTime(_currentMonth.year, _currentMonth.month, 1);
     int startWeekday = firstDay.weekday - 1;
     final daysInMonth =
         DateTime(_currentMonth.year, _currentMonth.month + 1, 0).day;
@@ -365,14 +437,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     final List<Widget> dayCells = [];
 
-    // Пустые ячейки в начале
     for (int i = 0; i < startWeekday; i++) {
       dayCells.add(const SizedBox());
     }
 
-    // Дни месяца
     for (int day = 1; day <= daysInMonth; day++) {
-      final date = DateTime(_currentMonth.year, _currentMonth.month, day);
+      final date =
+      DateTime(_currentMonth.year, _currentMonth.month, day);
       final isToday = date.year == today.year &&
           date.month == today.month &&
           date.day == today.day;
@@ -408,8 +479,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   '$day',
                   style: TextStyle(
                     fontSize: 14,
-                    fontWeight:
-                    isToday ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isToday
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                     color: isSelected
                         ? Colors.white
                         : isWeekend
@@ -447,12 +519,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  // Список мероприятий
-  Widget _buildEventsList() {
-    final isAdminOrTeacher =
-        context.read<AppState>().currentUser?.role != 'student';
-
-    // Если выбран день — показываем его мероприятия
+  Widget _buildEventsList(bool isAdminOrTeacher) {
     final eventsToShow = _selectedDay != null
         ? _eventsForDay(_selectedDay!)
         : _events;
@@ -499,9 +566,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
             itemBuilder: (context, index) {
               final event = eventsToShow[index];
               final color = _eventColor(event.type);
-              final typeName = AppConstants
-                  .eventTypeNames[event.type] ??
-                  event.type;
+              final typeName =
+                  AppConstants.eventTypeNames[event.type] ??
+                      event.type;
 
               return Card(
                 elevation: 0,
@@ -538,15 +605,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       Row(
                         children: [
                           const Icon(
-                              Icons.calendar_today_outlined,
-                              size: 12,
-                              color: Colors.grey),
+                            Icons.calendar_today_outlined,
+                            size: 12,
+                            color: Colors.grey,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             _dateFormat.format(event.eventDate),
                             style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey),
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
                           ),
                         ],
                       ),
@@ -560,11 +629,32 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     ],
                   ),
                   isThreeLine: true,
+                  // Кнопки редактировать и удалить
                   trailing: isAdminOrTeacher
-                      ? IconButton(
-                    icon: const Icon(Icons.delete_outline,
-                        color: Colors.red, size: 20),
-                    onPressed: () => _deleteEvent(event),
+                      ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.edit_outlined,
+                          color: Color(0xFF1565C0),
+                          size: 20,
+                        ),
+                        tooltip: 'Редактировать',
+                        onPressed: () => _showEventDialog(
+                          existingEvent: event,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                          size: 20,
+                        ),
+                        tooltip: 'Удалить',
+                        onPressed: () => _deleteEvent(event),
+                      ),
+                    ],
                   )
                       : null,
                 ),
