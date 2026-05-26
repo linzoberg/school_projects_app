@@ -16,13 +16,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const _HomeTab(),
-    const ProjectListScreen(),
-    const CalendarScreen(),
-    const ReportsScreen(),
-    const ProfileScreen(),
-  ];
+  void _switchTab(int index) {
+    setState(() => _currentIndex = index);
+  }
 
   final List<String> _titles = [
     'Главная',
@@ -34,19 +30,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Экраны собираем здесь, передавая колбэк переключения
+    final screens = [
+      _HomeTab(onSwitchTab: _switchTab),
+      const ProjectListScreen(),
+      const CalendarScreen(),
+      const ReportsScreen(),
+      const ProfileScreen(),
+    ];
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_titles[_currentIndex]),
       ),
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: screens,
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() => _currentIndex = index);
-        },
+        onDestinationSelected: _switchTab,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
@@ -79,19 +82,48 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// Вкладка Главная
-class _HomeTab extends StatelessWidget {
-  const _HomeTab();
+// ── ВКЛАДКА ГЛАВНАЯ ──────────────────────────────────────
+class _HomeTab extends StatefulWidget {
+  final Function(int) onSwitchTab;
+
+  const _HomeTab({required this.onSwitchTab});
+
+  @override
+  State<_HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<_HomeTab> {
+  // Ближайшие мероприятия — загружаем при открытии
+  int _projectsCount = 0;
+  bool _statsLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQuickStats();
+  }
+
+  Future<void> _loadQuickStats() async {
+    // Можно добавить загрузку счётчиков позже
+    setState(() => _statsLoaded = true);
+  }
 
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AppState>().currentUser;
+    final roleName = user?.role == 'admin'
+        ? 'Администратор'
+        : user?.role == 'teacher'
+        ? 'Руководитель'
+        : 'Ученик';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Приветствие
+
+          // ── КАРТОЧКА ПРИВЕТСТВИЯ ─────────────────────
           Card(
             color: const Color(0xFF1565C0),
             shape: RoundedRectangleBorder(
@@ -123,9 +155,7 @@ class _HomeTab extends StatelessWidget {
                         const Text(
                           'Добро пожаловать!',
                           style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 13,
-                          ),
+                              color: Colors.white70, fontSize: 13),
                         ),
                         Text(
                           user?.displayName ?? 'Пользователь',
@@ -144,15 +174,9 @@ class _HomeTab extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            user?.role == 'admin'
-                                ? 'Администратор'
-                                : user?.role == 'teacher'
-                                ? 'Руководитель'
-                                : 'Ученик',
+                            roleName,
                             style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                            ),
+                                color: Colors.white, fontSize: 12),
                           ),
                         ),
                       ],
@@ -164,7 +188,7 @@ class _HomeTab extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          // Быстрые действия
+          // ── БЫСТРЫЕ ДЕЙСТВИЯ ─────────────────────────
           const Text(
             'Быстрые действия',
             style: TextStyle(
@@ -173,6 +197,8 @@ class _HomeTab extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+
+          // Первая строка
           Row(
             children: [
               Expanded(
@@ -180,10 +206,7 @@ class _HomeTab extends StatelessWidget {
                   icon: Icons.folder_outlined,
                   label: 'Все проекты',
                   color: Colors.blue,
-                  onTap: () {
-                    // Переключение на вкладку Проекты
-                    // через HomeScreen — упрощённо
-                  },
+                  onTap: () => widget.onSwitchTab(1),
                 ),
               ),
               const SizedBox(width: 12),
@@ -192,12 +215,14 @@ class _HomeTab extends StatelessWidget {
                   icon: Icons.calendar_today_outlined,
                   label: 'Календарь',
                   color: Colors.green,
-                  onTap: () {},
+                  onTap: () => widget.onSwitchTab(2),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
+
+          // Вторая строка
           Row(
             children: [
               Expanded(
@@ -205,7 +230,7 @@ class _HomeTab extends StatelessWidget {
                   icon: Icons.bar_chart_outlined,
                   label: 'Отчёты',
                   color: Colors.orange,
-                  onTap: () {},
+                  onTap: () => widget.onSwitchTab(3),
                 ),
               ),
               const SizedBox(width: 12),
@@ -214,32 +239,51 @@ class _HomeTab extends StatelessWidget {
                   icon: Icons.person_outlined,
                   label: 'Профиль',
                   color: Colors.purple,
-                  onTap: () {},
+                  onTap: () => widget.onSwitchTab(4),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 24),
 
-          // Подсказка
+          // ── ПОДСКАЗКИ ПО РОЛЯМ ────────────────────────
+          _buildRoleHint(user?.role ?? 'student'),
+          const SizedBox(height: 16),
+
+          // ── О ПРИЛОЖЕНИИ ─────────────────────────────
           Card(
-            color: Colors.blue.shade50,
             elevation: 0,
+            color: Colors.blue.shade50,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
               side: BorderSide(color: Colors.blue.shade100),
             ),
             child: const Padding(
               padding: EdgeInsets.all(16),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline, color: Color(0xFF1565C0)),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Перейдите в раздел «Проекты» для просмотра и создания карточек проектов.',
-                      style: TextStyle(fontSize: 13),
-                    ),
+                  Row(
+                    children: [
+                      Icon(Icons.info_outline,
+                          color: Color(0xFF1565C0)),
+                      SizedBox(width: 8),
+                      Text(
+                        'О приложении',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1565C0),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Система управления проектной деятельностью '
+                        'школьников. Позволяет вести каталог проектов, '
+                        'отслеживать статусы, хранить материалы и '
+                        'планировать мероприятия.',
+                    style: TextStyle(fontSize: 13, height: 1.5),
                   ),
                 ],
               ),
@@ -249,8 +293,63 @@ class _HomeTab extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildRoleHint(String role) {
+    String hint;
+    IconData icon;
+    Color color;
+
+    switch (role) {
+      case 'admin':
+        hint = 'У вас права администратора: вы можете создавать, '
+            'редактировать и удалять любые проекты, '
+            'управлять мероприятиями и просматривать отчёты.';
+        icon = Icons.admin_panel_settings_outlined;
+        color = Colors.red;
+        break;
+      case 'teacher':
+        hint = 'У вас права руководителя: вы можете создавать '
+            'и редактировать проекты, добавлять мероприятия '
+            'в календарь и просматривать отчёты.';
+        icon = Icons.school_outlined;
+        color = Colors.orange;
+        break;
+      default:
+        hint = 'Вы можете просматривать каталог проектов, '
+            'следить за расписанием мероприятий '
+            'и просматривать свои проекты в профиле.';
+        icon = Icons.person_outlined;
+        color = Colors.blue;
+    }
+
+    return Card(
+      elevation: 0,
+      color: color.withOpacity(0.05),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: color.withOpacity(0.2)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                hint,
+                style: const TextStyle(fontSize: 13, height: 1.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
+// ── ВИДЖЕТ БЫСТРОГО ДЕЙСТВИЯ ─────────────────────────────
 class _QuickActionCard extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -276,10 +375,18 @@ class _QuickActionCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 32),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 28),
+              ),
               const SizedBox(height: 8),
               Text(
                 label,
