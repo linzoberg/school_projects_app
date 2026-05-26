@@ -135,4 +135,16 @@ class AuthService {
         return 'Ошибка авторизации: ${e.message}';
     }
   }
+
+  // Получить всех пользователей из базы
+  Future<List<UserModel>> getAllUsers() async {
+    try {
+      final snapshot = await _db.collection('users').get();
+      return snapshot.docs
+          .map((doc) => UserModel.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      return [];
+    }
+  }
 }

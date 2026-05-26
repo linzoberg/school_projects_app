@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../app_state.dart';
 import '../../models/project_model.dart';
+import '../../models/user_model.dart';
+import '../../services/auth_service.dart';
 import '../../services/project_service.dart';
 import '../../utils/constants.dart';
 
@@ -18,6 +20,7 @@ class ProjectFormScreen extends StatefulWidget {
 class _ProjectFormScreenState extends State<ProjectFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final ProjectService _projectService = ProjectService();
+  final AuthService _authService = AuthService();
 
   // Контроллеры полей
   final _titleController = TextEditingController();
@@ -35,7 +38,10 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
 
   // Участники
   final List<ProjectParticipant> _participants = [];
-  final _participantNameController = TextEditingController();
+
+  // Все пользователи из БД
+  List<UserModel> _allUsers = [];
+  bool _usersLoading = true;
 
   bool _isLoading = false;
   bool get _isEditing => widget.project != null;
@@ -46,13 +52,23 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
   void initState() {
     super.initState();
     _fillFormIfEditing();
+    _loadAllUsers();
   }
 
-  // Заполняем форму при редактировании
+  // Загружаем всех пользователей для выбора участников
+  Future<void> _loadAllUsers() async {
+    setState(() => _usersLoading = true);
+    final users = await _authService.getAllUsers();
+    setState(() {
+      _allUsers = users;
+      _usersLoading = false;
+    });
+  }
+
   void _fillFormIfEditing() {
     final p = widget.project;
     if (p == null) {
-      // При создании — добавляем текущего пользователя как автора
+      // При создании добавляем текущего пользователя как автора
       final user = context.read<AppState>().currentUser;
       if (user != null) {
         _participants.add(ProjectParticipant(
@@ -85,7 +101,6 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
     _schoolNameController.dispose();
     _resultsController.dispose();
     _awardsController.dispose();
-    _participantNameController.dispose();
     super.dispose();
   }
 
@@ -96,7 +111,6 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
       initialDate: isStart ? _startDate : (_endDate ?? DateTime.now()),
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
-      locale: const Locale('ru'),
     );
     if (picked != null) {
       setState(() {
@@ -109,45 +123,237 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
     }
   }
 
-  // Добавить участника
-  void _addParticipant() {
+  // Диалог добавления участника из списка
+  void _showAddParticipantDialog() {
+    // Уже добавленные id
+    final addedIds = _participants.map((p) => p.userId).toSet();
+
+    // Фильтруем — убираем уже добавленных
+    final availableUsers = _allUsers
+        .where((u) => !addedIds.contains(u.id))
+        .toList();
+
+    String searchQuery = '';
+    final searchController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Фильтрация по поиску
+            final filtered = availableUsers.where((u) {
+              if (searchQuery.isEmpty) return true;
+              return u.displayName
+                  .toLowerCase()
+                  .contains(searchQuery.toLowerCase()) ||
+                  u.email
+                      .toLowerCase()
+                      .contains(searchQuery.toLowerCase());
+            }).toList();
+
+            return AlertDialog(
+              title: const Text('Добавить участника'),
+              contentPadding:
+              const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              content: SizedBox(
+                width: double.maxFinite,
+                height: 400,
+                child: Column(
+                  children: [
+                    // Поиск по имени
+                    TextField(
+                      controller: searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Поиск по имени или email...',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        isDense: true,
+                        suffixIcon: searchQuery.isNotEmpty
+                            ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            searchController.clear();
+                            setDialogState(
+                                    () => searchQuery = '');
+                          },
+                        )
+                            : null,
+                      ),
+                      onChanged: (v) =>
+                          setDialogState(() => searchQuery = v),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Счётчик
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Найдено: ${filtered.length}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+
+                    // Список пользователей
+                    Expanded(
+                      child: _usersLoading
+                          ? const Center(
+                          child: CircularProgressIndicator())
+                          : filtered.isEmpty
+                          ? Center(
+                        child: Column(
+                          mainAxisAlignment:
+                          MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.person_off,
+                                size: 48,
+                                color: Colors.grey.shade300),
+                            const SizedBox(height: 8),
+                            Text(
+                              availableUsers.isEmpty
+                                  ? 'Все пользователи уже добавлены'
+                                  : 'Пользователи не найдены',
+                              style: const TextStyle(
+                                  color: Colors.grey),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      )
+                          : ListView.builder(
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final u = filtered[index];
+                          final roleName = AppConstants
+                              .roleNames[u.role] ??
+                              u.role;
+
+                          return ListTile(
+                            contentPadding:
+                            const EdgeInsets.symmetric(
+                                horizontal: 4),
+                            leading: CircleAvatar(
+                              backgroundColor: const Color(
+                                  0xFF1565C0)
+                                  .withOpacity(0.15),
+                              child: Text(
+                                u.displayName.isNotEmpty
+                                    ? u.displayName[0]
+                                    .toUpperCase()
+                                    : '?',
+                                style: const TextStyle(
+                                  color: Color(0xFF1565C0),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              u.displayName,
+                              style: const TextStyle(
+                                  fontSize: 14),
+                            ),
+                            subtitle: Text(
+                              '${u.email} · $roleName',
+                              style: const TextStyle(
+                                  fontSize: 11),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                setState(() {
+                                  _participants.add(
+                                    ProjectParticipant(
+                                      userId: u.id,
+                                      displayName:
+                                      u.displayName,
+                                      role: 'member',
+                                    ),
+                                  );
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                padding:
+                                const EdgeInsets.symmetric(
+                                    horizontal: 10),
+                                minimumSize:
+                                const Size(60, 32),
+                              ),
+                              child: const Text(
+                                'Добавить',
+                                style:
+                                TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                // Кнопка для добавления вручную если нужного нет в БД
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _showAddManualParticipantDialog();
+                  },
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text('Ввести вручную'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Закрыть'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Диалог добавления участника вручную (запасной вариант)
+  void _showAddManualParticipantDialog() {
+    final nameController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Добавить участника'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _participantNameController,
-              decoration: const InputDecoration(
-                labelText: 'Имя участника',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: true,
-            ),
-          ],
+        title: const Text('Добавить вручную'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(
+            labelText: 'Имя и фамилия',
+            border: OutlineInputBorder(),
+            hintText: 'Например: Иванов Иван',
+          ),
+          autofocus: true,
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              _participantNameController.clear();
-              Navigator.pop(context);
-            },
+            onPressed: () => Navigator.pop(context),
             child: const Text('Отмена'),
           ),
           ElevatedButton(
             onPressed: () {
-              final name = _participantNameController.text.trim();
+              final name = nameController.text.trim();
               if (name.isNotEmpty) {
                 setState(() {
                   _participants.add(ProjectParticipant(
-                    userId: 'manual_${DateTime.now().millisecondsSinceEpoch}',
+                    userId:
+                    'manual_${DateTime.now().millisecondsSinceEpoch}',
                     displayName: name,
                     role: 'member',
                   ));
                 });
-                _participantNameController.clear();
                 Navigator.pop(context);
               }
             },
@@ -170,13 +376,11 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
     setState(() => _isLoading = true);
 
     final user = context.read<AppState>().currentUser;
-
-    // Список id участников для быстрого поиска
-    final participantIds = _participants.map((p) => p.userId).toList();
+    final participantIds =
+    _participants.map((p) => p.userId).toList();
 
     try {
       if (_isEditing) {
-        // Редактирование
         final updated = ProjectModel(
           id: widget.project!.id,
           title: _titleController.text.trim(),
@@ -199,7 +403,6 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
         );
         await _projectService.updateProject(updated);
       } else {
-        // Создание
         final newProject = ProjectModel(
           id: '',
           title: _titleController.text.trim(),
@@ -242,7 +445,8 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? 'Редактировать проект' : 'Новый проект'),
+        title:
+        Text(_isEditing ? 'Редактировать проект' : 'Новый проект'),
         actions: [
           if (!_isLoading)
             TextButton(
@@ -275,7 +479,7 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── ОСНОВНАЯ ИНФОРМАЦИЯ ──────────────────
+              // ── ОСНОВНАЯ ИНФОРМАЦИЯ ──────────────
               _sectionHeader('Основная информация'),
               const SizedBox(height: 12),
 
@@ -289,10 +493,10 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
                 maxLength: 120,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
-                    return 'Введите название проекта';
+                    return 'Введите название';
                   }
                   if (v.trim().length < 3) {
-                    return 'Название слишком короткое';
+                    return 'Слишком короткое';
                   }
                   return null;
                 },
@@ -311,7 +515,7 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
                 maxLength: 200,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
-                    return 'Введите краткое описание';
+                    return 'Введите описание';
                   }
                   return null;
                 },
@@ -327,9 +531,7 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
                 ),
                 items: AppConstants.directions.map((d) {
                   return DropdownMenuItem(
-                    value: d,
-                    child: Text(d),
-                  );
+                      value: d, child: Text(d));
                 }).toList(),
                 onChanged: (v) =>
                     setState(() => _selectedDirection = v!),
@@ -345,20 +547,17 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
                 ),
                 items: AppConstants.statusNames.entries.map((e) {
                   return DropdownMenuItem(
-                    value: e.key,
-                    child: Text(e.value),
-                  );
+                      value: e.key, child: Text(e.value));
                 }).toList(),
                 onChanged: (v) =>
                     setState(() => _selectedStatus = v!),
               ),
               const SizedBox(height: 24),
 
-              // ── ОРГАНИЗАЦИЯ И СРОКИ ──────────────────
+              // ── ОРГАНИЗАЦИЯ И СРОКИ ──────────────
               _sectionHeader('Организация и сроки'),
               const SizedBox(height: 12),
 
-              // Школа/организация
               TextFormField(
                 controller: _schoolNameController,
                 decoration: const InputDecoration(
@@ -378,8 +577,8 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
                       child: InputDecorator(
                         decoration: const InputDecoration(
                           labelText: 'Дата начала',
-                          prefixIcon:
-                          Icon(Icons.calendar_today_outlined),
+                          prefixIcon: Icon(
+                              Icons.calendar_today_outlined),
                         ),
                         child: Text(
                           _dateFormat.format(_startDate),
@@ -424,7 +623,7 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
               ),
               const SizedBox(height: 24),
 
-              // ── ОПИСАНИЕ ─────────────────────────────
+              // ── ОПИСАНИЕ ─────────────────────────
               _sectionHeader('Подробное описание'),
               const SizedBox(height: 12),
 
@@ -433,7 +632,7 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Полное описание проекта',
                   hintText:
-                  'Цели, задачи, методы исследования, актуальность...',
+                  'Цели, задачи, методы исследования...',
                   alignLabelWithHint: true,
                   border: OutlineInputBorder(),
                 ),
@@ -442,15 +641,17 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
               ),
               const SizedBox(height: 24),
 
-              // ── УЧАСТНИКИ ────────────────────────────
+              // ── УЧАСТНИКИ ────────────────────────
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment:
+                MainAxisAlignment.spaceBetween,
                 children: [
                   _sectionHeader(
                       'Участники (${_participants.length})'),
                   TextButton.icon(
-                    onPressed: _addParticipant,
-                    icon: const Icon(Icons.person_add_outlined),
+                    onPressed: _showAddParticipantDialog,
+                    icon:
+                    const Icon(Icons.person_add_outlined),
                     label: const Text('Добавить'),
                   ),
                 ],
@@ -472,6 +673,11 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
                     elevation: 0,
                     color: Colors.grey.shade50,
                     margin: const EdgeInsets.only(bottom: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: BorderSide(
+                          color: Colors.grey.shade200),
+                    ),
                     child: ListTile(
                       leading: CircleAvatar(
                         backgroundColor: const Color(0xFF1565C0)
@@ -486,7 +692,9 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
                       ),
                       title: Text(p.displayName),
                       subtitle: Text(
-                        p.role == 'author' ? 'Автор' : 'Участник',
+                        p.role == 'author'
+                            ? 'Автор проекта'
+                            : 'Участник',
                         style: const TextStyle(fontSize: 12),
                       ),
                       trailing: p.role != 'author'
@@ -503,7 +711,7 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
                 }),
               const SizedBox(height: 24),
 
-              // ── РЕЗУЛЬТАТЫ И НАГРАДЫ ─────────────────
+              // ── РЕЗУЛЬТАТЫ И НАГРАДЫ ─────────────
               _sectionHeader('Результаты и достижения'),
               const SizedBox(height: 12),
 
@@ -511,8 +719,9 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
                 controller: _resultsController,
                 decoration: const InputDecoration(
                   labelText: 'Результаты работы',
-                  prefixIcon: Icon(Icons.assignment_turned_in_outlined),
-                  hintText: 'Что было достигнуто, выводы...',
+                  prefixIcon: Icon(
+                      Icons.assignment_turned_in_outlined),
+                  hintText: 'Что было достигнуто...',
                   alignLabelWithHint: true,
                   border: OutlineInputBorder(),
                 ),
@@ -524,9 +733,10 @@ class _ProjectFormScreenState extends State<ProjectFormScreen> {
                 controller: _awardsController,
                 decoration: const InputDecoration(
                   labelText: 'Награды и призовые места',
-                  prefixIcon: Icon(Icons.emoji_events_outlined),
+                  prefixIcon:
+                  Icon(Icons.emoji_events_outlined),
                   hintText:
-                  'Например: 1 место на региональной олимпиаде',
+                  '1 место на региональной олимпиаде...',
                 ),
               ),
               const SizedBox(height: 32),
