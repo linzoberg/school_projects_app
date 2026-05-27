@@ -6,6 +6,360 @@ import '../../models/event_model.dart';
 import '../../services/event_service.dart';
 import '../../utils/constants.dart';
 
+// ═══════════════════════════════════════════════════════
+//  КАРТОЧКА МЕРОПРИЯТИЯ  (новый экран)
+// ═══════════════════════════════════════════════════════
+class EventDetailScreen extends StatelessWidget {
+  final EventModel event;
+  final bool isAdmin;
+  final bool isAdminOrTeacher;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const EventDetailScreen({
+    super.key,
+    required this.event,
+    required this.isAdmin,
+    required this.isAdminOrTeacher,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  Color _eventColor(String type) {
+    switch (type) {
+      case AppConstants.eventTypeOlympiad:
+        return Colors.purple;
+      case AppConstants.eventTypeContest:
+        return Colors.orange;
+      case AppConstants.eventTypeDefense:
+        return Colors.blue;
+      case AppConstants.eventTypeTrip:
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _eventIcon(String type) {
+    switch (type) {
+      case AppConstants.eventTypeOlympiad:
+        return Icons.emoji_events_outlined;
+      case AppConstants.eventTypeContest:
+        return Icons.workspace_premium_outlined;
+      case AppConstants.eventTypeDefense:
+        return Icons.school_outlined;
+      case AppConstants.eventTypeTrip:
+        return Icons.directions_bus_outlined;
+      default:
+        return Icons.event_outlined;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _eventColor(event.type);
+    final typeName =
+        AppConstants.eventTypeNames[event.type] ?? event.type;
+    final dateFormat = DateFormat('dd MMMM yyyy', 'ru');
+    final dateFormatShort = DateFormat('dd.MM.yyyy');
+
+    return Scaffold(
+      // ── AppBar ────────────────────────────────────────
+      appBar: AppBar(
+        title: const Text('Карточка мероприятия'),
+        actions: [
+          if (isAdminOrTeacher)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Редактировать',
+              onPressed: () {
+                Navigator.pop(context);
+                onEdit();
+              },
+            ),
+          if (isAdmin)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Удалить',
+              onPressed: () {
+                Navigator.pop(context);
+                onDelete();
+              },
+            ),
+        ],
+      ),
+
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Цветная шапка с иконкой и типом ──────────
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    color,
+                    color.withOpacity(0.75),
+                  ],
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Тип мероприятия — чип
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.25),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(_eventIcon(event.type),
+                            color: Colors.white, size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          typeName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  // Название
+                  Text(
+                    event.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Дата в шапке
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today_outlined,
+                          color: Colors.white70, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        dateFormat.format(event.eventDate),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Тело карточки ─────────────────────────────
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Информационный блок
+                  _infoCard([
+                    _infoRow(
+                      Icons.event_outlined,
+                      'Дата',
+                      dateFormatShort.format(event.eventDate),
+                    ),
+                    _dividerThin(),
+                    _infoRow(
+                      Icons.category_outlined,
+                      'Тип',
+                      typeName,
+                    ),
+                    if (event.createdBy.isNotEmpty) ...[
+                      _dividerThin(),
+                      _infoRow(
+                        Icons.person_outlined,
+                        'Создал',
+                        event.createdBy,
+                      ),
+                    ],
+                  ]),
+
+                  const SizedBox(height: 20),
+
+                  // Описание
+                  if (event.description.isNotEmpty) ...[
+                    _sectionTitle('Описание'),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border:
+                        Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Text(
+                        event.description,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          height: 1.6,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+
+                  // Кнопки действий
+                  if (isAdminOrTeacher) ...[
+                    const Divider(),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              onEdit();
+                            },
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text('Редактировать'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor:
+                              const Color(0xFF1565C0),
+                              side: const BorderSide(
+                                  color: Color(0xFF1565C0)),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius:
+                                BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (isAdmin) ...[
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                onDelete();
+                              },
+                              icon: const Icon(
+                                  Icons.delete_outline),
+                              label: const Text('Удалить'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red,
+                                side: const BorderSide(
+                                    color: Colors.red),
+                                padding:
+                                const EdgeInsets.symmetric(
+                                    vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                  BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Вспомогательные виджеты ─────────────────────────
+  Widget _sectionTitle(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.bold,
+        color: Color(0xFF1565C0),
+      ),
+    );
+  }
+
+  Widget _infoCard(List<Widget> children) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      padding:
+      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: Colors.grey.shade600),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 80,
+            child: Text(
+              label,
+              style: TextStyle(
+                  color: Colors.grey.shade600, fontSize: 13),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dividerThin() {
+    return Divider(height: 1, color: Colors.grey.shade200);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  ЭКРАН КАЛЕНДАРЯ  (изменённый)
+// ═══════════════════════════════════════════════════════
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
 
@@ -15,30 +369,24 @@ class CalendarScreen extends StatefulWidget {
 
 class _CalendarScreenState extends State<CalendarScreen> {
   final EventService _eventService = EventService();
-
   DateTime _currentMonth = DateTime.now();
   DateTime? _selectedDay;
   List<EventModel> _events = [];
   bool _isLoading = true;
-
-
   late DateFormat _dateFormat;
   late DateFormat _timeFormat;
 
   @override
   void initState() {
     super.initState();
-    // НЕ используем _monthFormat для заголовка — он даёт родительный падеж
     _dateFormat = DateFormat('dd.MM.yyyy');
     _timeFormat = DateFormat('dd MMMM', 'ru');
     _loadEvents();
   }
 
-// Названия месяцев в именительном падеже
   static const List<String> _monthNames = [
-    'ЯНВАРЬ', 'ФЕВРАЛЬ', 'МАРТ', 'АПРЕЛЬ',
-    'МАЙ', 'ИЮНЬ', 'ИЮЛЬ', 'АВГУСТ',
-    'СЕНТЯБРЬ', 'ОКТЯБРЬ', 'НОЯБРЬ', 'ДЕКАБРЬ',
+    'ЯНВАРЬ', 'ФЕВРАЛЬ', 'МАРТ', 'АПРЕЛЬ', 'МАЙ', 'ИЮНЬ',
+    'ИЮЛЬ', 'АВГУСТ', 'СЕНТЯБРЬ', 'ОКТЯБРЬ', 'НОЯБРЬ', 'ДЕКАБРЬ',
   ];
 
   String _formatMonth(DateTime date) {
@@ -83,11 +431,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _loadEvents();
   }
 
-  // ── ДИАЛОГ СОЗДАНИЯ / РЕДАКТИРОВАНИЯ ──────────────────
+  // ── ДИАЛОГ СОЗДАНИЯ / РЕДАКТИРОВАНИЯ ────────────────
   void _showEventDialog({EventModel? existingEvent}) {
     final user = context.read<AppState>().currentUser;
     final isEditing = existingEvent != null;
-
     final titleController = TextEditingController(
       text: existingEvent?.title ?? '',
     );
@@ -108,8 +455,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
               title: Text(
                 isEditing ? 'Редактировать' : 'Новое мероприятие',
               ),
-              // Убираем горизонтальный padding у content
-              contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              contentPadding:
+              const EdgeInsets.fromLTRB(16, 12, 16, 0),
               content: SizedBox(
                 width: double.maxFinite,
                 child: SingleChildScrollView(
@@ -117,7 +464,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Название
                       TextField(
                         controller: titleController,
                         decoration: const InputDecoration(
@@ -127,8 +473,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         ),
                       ),
                       const SizedBox(height: 10),
-
-                      // Описание
                       TextField(
                         controller: descController,
                         decoration: const InputDecoration(
@@ -139,14 +483,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         maxLines: 2,
                       ),
                       const SizedBox(height: 10),
-
-                      // Тип — используем простой список вместо Dropdown
                       const Text(
                         'Тип мероприятия:',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey,
-                        ),
+                        style:
+                        TextStyle(fontSize: 13, color: Colors.grey),
                       ),
                       const SizedBox(height: 6),
                       Wrap(
@@ -154,20 +494,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         runSpacing: 6,
                         children: AppConstants.eventTypeNames.entries
                             .map((entry) {
-                          final isSelected = selectedType == entry.key;
+                          final isSelected =
+                              selectedType == entry.key;
                           return GestureDetector(
                             onTap: () => setDialogState(
                                     () => selectedType = entry.key),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
+                                  horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
                                 color: isSelected
                                     ? const Color(0xFF1565C0)
                                     : Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius:
+                                BorderRadius.circular(16),
                                 border: Border.all(
                                   color: isSelected
                                       ? const Color(0xFF1565C0)
@@ -191,8 +531,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         }).toList(),
                       ),
                       const SizedBox(height: 10),
-
-                      // Дата
                       InkWell(
                         onTap: () async {
                           final picked = await showDatePicker(
@@ -202,30 +540,30 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             lastDate: DateTime(2030),
                           );
                           if (picked != null) {
-                            setDialogState(() => selectedDate = picked);
+                            setDialogState(
+                                    () => selectedDate = picked);
                           }
                         },
                         child: Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 12,
-                          ),
+                              horizontal: 12, vertical: 12),
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade400),
+                            border: Border.all(
+                                color: Colors.grey.shade400),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Row(
                             children: [
                               const Icon(
-                                Icons.calendar_today_outlined,
-                                size: 18,
-                                color: Colors.grey,
-                              ),
+                                  Icons.calendar_today_outlined,
+                                  size: 18,
+                                  color: Colors.grey),
                               const SizedBox(width: 8),
                               Text(
                                 _dateFormat.format(selectedDate),
-                                style: const TextStyle(fontSize: 15),
+                                style:
+                                const TextStyle(fontSize: 15),
                               ),
                             ],
                           ),
@@ -252,9 +590,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       );
                       return;
                     }
-
                     if (isEditing) {
-                      // Редактирование
                       final updated = EventModel(
                         id: existingEvent.id,
                         title: titleController.text.trim(),
@@ -265,7 +601,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       );
                       await _eventService.updateEvent(updated);
                     } else {
-                      // Создание
                       final event = EventModel(
                         id: '',
                         title: titleController.text.trim(),
@@ -276,11 +611,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       );
                       await _eventService.createEvent(event);
                     }
-
                     if (context.mounted) Navigator.pop(context);
                     _loadEvents();
                   },
-                  child: Text(isEditing ? 'Сохранить' : 'Создать'),
+                  child:
+                  Text(isEditing ? 'Сохранить' : 'Создать'),
                 ),
               ],
             );
@@ -307,12 +642,30 @@ class _CalendarScreenState extends State<CalendarScreen> {
               await _eventService.deleteEvent(event.id);
               _loadEvents();
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style:
+            TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Удалить'),
           ),
         ],
       ),
     );
+  }
+
+  // ── Открыть карточку мероприятия ────────────────────
+  void _openEventDetail(
+      EventModel event, bool isAdminOrTeacher, bool isAdmin) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EventDetailScreen(
+          event: event,
+          isAdmin: isAdmin,
+          isAdminOrTeacher: isAdminOrTeacher,
+          onEdit: () => _showEventDialog(existingEvent: event),
+          onDelete: () => _deleteEvent(event),
+        ),
+      ),
+    ).then((_) => _loadEvents());
   }
 
   Color _eventColor(String type) {
@@ -347,8 +700,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isAdminOrTeacher =
-        context.watch<AppState>().currentUser?.role != 'student';
+    final user = context.watch<AppState>().currentUser;
+    final isAdminOrTeacher = user?.role == AppConstants.roleAdmin ||
+        user?.role == AppConstants.roleTeacher;
+    // ↓ Патч 1: удалять может только Admin
+    final isAdmin = user?.role == AppConstants.roleAdmin;
 
     return Scaffold(
       body: Column(
@@ -388,13 +744,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
             color: const Color(0xFF1565C0).withOpacity(0.05),
             child: Column(
               children: [
-                // Дни недели
                 Padding(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 8, vertical: 6),
                   child: Row(
                     children: [
-                      'Пн','Вт','Ср','Чт','Пт','Сб','Вс'
+                      'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'
                     ].map((day) => Expanded(
                       child: Center(
                         child: Text(
@@ -422,7 +777,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _buildEventsList(isAdminOrTeacher),
+                : _buildEventsList(isAdminOrTeacher, isAdmin),
           ),
         ],
       ),
@@ -445,7 +800,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final daysInMonth =
         DateTime(_currentMonth.year, _currentMonth.month + 1, 0).day;
     final today = DateTime.now();
-
     final List<Widget> dayCells = [];
 
     for (int i = 0; i < startWeekday; i++) {
@@ -455,16 +809,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
     for (int day = 1; day <= daysInMonth; day++) {
       final date =
       DateTime(_currentMonth.year, _currentMonth.month, day);
-      final isToday = date.year == today.year &&
-          date.month == today.month &&
-          date.day == today.day;
+      final dayEvents = _eventsForDay(date);
+      final hasEvents = dayEvents.isNotEmpty;
       final isSelected = _selectedDay != null &&
           _selectedDay!.year == date.year &&
           _selectedDay!.month == date.month &&
           _selectedDay!.day == date.day;
-      final dayEvents = _eventsForDay(date);
-      final hasEvents = dayEvents.isNotEmpty;
-      final isWeekend = date.weekday >= 6;
+      final isToday = today.year == date.year &&
+          today.month == date.month &&
+          today.day == date.day;
+      final isWeekend =
+          date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
 
       dayCells.add(
         GestureDetector(
@@ -490,9 +845,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   '$day',
                   style: TextStyle(
                     fontSize: 14,
-                    fontWeight: isToday
-                        ? FontWeight.bold
-                        : FontWeight.normal,
+                    fontWeight:
+                    isToday ? FontWeight.bold : FontWeight.normal,
                     color: isSelected
                         ? Colors.white
                         : isWeekend
@@ -530,11 +884,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  Widget _buildEventsList(bool isAdminOrTeacher) {
+  // ↓ Патч 1 + Патч 2: isAdmin передаётся отдельно
+  Widget _buildEventsList(bool isAdminOrTeacher, bool isAdmin) {
     final eventsToShow = _selectedDay != null
         ? _eventsForDay(_selectedDay!)
         : _events;
-
     final title = _selectedDay != null
         ? _timeFormat.format(_selectedDay!)
         : 'Все мероприятия месяца';
@@ -566,13 +920,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   _selectedDay != null
                       ? 'В этот день нет мероприятий'
                       : 'В этом месяце нет мероприятий',
-                  style: const TextStyle(color: Colors.grey),
+                  style:
+                  const TextStyle(color: Colors.grey),
                 ),
               ],
             ),
           )
               : ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding:
+            const EdgeInsets.symmetric(horizontal: 12),
             itemCount: eventsToShow.length,
             itemBuilder: (context, index) {
               final event = eventsToShow[index];
@@ -586,88 +942,104 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 margin: const EdgeInsets.only(bottom: 8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.grey.shade200),
+                  side: BorderSide(
+                      color: Colors.grey.shade200),
                 ),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: color.withOpacity(0.15),
-                    child: Icon(
-                      _eventIcon(event.type),
-                      color: color,
-                      size: 20,
+                // ↓ Патч 2: открывает Карточку мероприятия
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => _openEventDetail(
+                      event, isAdminOrTeacher, isAdmin),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor:
+                      color.withOpacity(0.15),
+                      child: Icon(
+                        _eventIcon(event.type),
+                        color: color,
+                        size: 20,
+                      ),
+                    ),
+                    title: Text(
+                      event.title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          typeName,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            const Icon(
+                                Icons
+                                    .calendar_today_outlined,
+                                size: 12,
+                                color: Colors.grey),
+                            const SizedBox(width: 4),
+                            Text(
+                              _dateFormat
+                                  .format(event.eventDate),
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                        if (event.description.isNotEmpty)
+                          Text(
+                            event.description,
+                            style: const TextStyle(
+                                fontSize: 12),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                    isThreeLine: true,
+                    // ↓ Патч 1+2: кнопки в списке теперь открывают
+                    //   карточку (стрелка вправо) вместо иконок удаления
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isAdminOrTeacher)
+                          IconButton(
+                            icon: const Icon(
+                                Icons.edit_outlined,
+                                color: Color(0xFF1565C0),
+                                size: 20),
+                            tooltip: 'Редактировать',
+                            onPressed: () =>
+                                _showEventDialog(
+                                    existingEvent: event),
+                          ),
+                        if (isAdmin)
+                        // ↓ Патч 1: кнопка удаления только для Admin
+                          IconButton(
+                            icon: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.red,
+                                size: 20),
+                            tooltip: 'Удалить',
+                            onPressed: () =>
+                                _deleteEvent(event),
+                          ),
+                        const Icon(
+                          Icons.chevron_right,
+                          color: Colors.grey,
+                          size: 20,
+                        ),
+                      ],
                     ),
                   ),
-                  title: Text(
-                    event.title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        typeName,
-                        style: TextStyle(
-                          color: color,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.calendar_today_outlined,
-                            size: 12,
-                            color: Colors.grey,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            _dateFormat.format(event.eventDate),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (event.description.isNotEmpty)
-                        Text(
-                          event.description,
-                          style: const TextStyle(fontSize: 12),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                    ],
-                  ),
-                  isThreeLine: true,
-                  // Кнопки редактировать и удалить
-                  trailing: isAdminOrTeacher
-                      ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(
-                          Icons.edit_outlined,
-                          color: Color(0xFF1565C0),
-                          size: 20,
-                        ),
-                        tooltip: 'Редактировать',
-                        onPressed: () => _showEventDialog(
-                          existingEvent: event,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          color: Colors.red,
-                          size: 20,
-                        ),
-                        tooltip: 'Удалить',
-                        onPressed: () => _deleteEvent(event),
-                      ),
-                    ],
-                  )
-                      : null,
                 ),
               );
             },
