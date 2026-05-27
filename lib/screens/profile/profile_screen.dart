@@ -4,6 +4,7 @@ import '../../app_state.dart';
 import '../../models/project_model.dart';
 import '../../services/project_service.dart';
 import '../../utils/constants.dart';
+import '../projects/project_detail_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -241,8 +242,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               )
             else
               ..._myProjects.map((p) {
-                final statusName =
-                    AppConstants.statusNames[p.status] ?? p.status;
+                final statusName = AppConstants.statusNames[p.status] ?? p.status;
                 final statusColor = _statusColor(p.status);
 
                 return Card(
@@ -254,16 +254,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor:
-                      statusColor.withOpacity(0.15),
-                      child: Icon(Icons.folder,
-                          color: statusColor, size: 20),
+                      backgroundColor: statusColor.withOpacity(0.15),
+                      child: Icon(Icons.folder, color: statusColor, size: 20),
                     ),
                     title: Text(
                       p.title,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14),
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                       overflow: TextOverflow.ellipsis,
                     ),
                     subtitle: Text(
@@ -271,8 +267,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: const TextStyle(fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                     ),
-                    trailing: const Icon(Icons.chevron_right,
-                        color: Colors.grey),
+                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProjectDetailScreen(projectId: p.id),
+                        ),
+                      ).then((_) => _loadMyProjects()); // обновить список при возврате
+                    },
                   ),
                 );
               }),
