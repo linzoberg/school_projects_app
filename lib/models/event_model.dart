@@ -2,9 +2,11 @@ class EventModel {
   final String id;
   final String title;
   final String description;
-  final DateTime eventDate;    // дата начала
-  final DateTime? endDate;     // ← НОВОЕ: дата завершения
-  final String type;           // olympiad, contest, defense, trip, other
+  final DateTime eventDate;     // дата начала
+  final DateTime? endDate;      // дата завершения
+  final String? startTime;      // ← НОВОЕ: время начала (формат "HH:mm")
+  final String? endTime;        // ← НОВОЕ: время завершения (формат "HH:mm")
+  final String type;            // olympiad, contest, defense, trip, other
   final String? linkedProjectId;
   final String createdBy;
 
@@ -13,7 +15,9 @@ class EventModel {
     required this.title,
     required this.description,
     required this.eventDate,
-    this.endDate,              // ← НОВОЕ
+    this.endDate,
+    this.startTime,              // ← НОВОЕ
+    this.endTime,                // ← НОВОЕ
     required this.type,
     this.linkedProjectId,
     required this.createdBy,
@@ -27,9 +31,11 @@ class EventModel {
       eventDate: map['eventDate'] != null
           ? DateTime.parse(map['eventDate'])
           : DateTime.now(),
-      endDate: map['endDate'] != null          // ← НОВОЕ
+      endDate: map['endDate'] != null
           ? DateTime.parse(map['endDate'])
           : null,
+      startTime: map['startTime'],   // ← НОВОЕ
+      endTime: map['endTime'],       // ← НОВОЕ
       type: map['type'] ?? 'other',
       linkedProjectId: map['linkedProjectId'],
       createdBy: map['createdBy'] ?? '',
@@ -41,7 +47,9 @@ class EventModel {
       'title': title,
       'description': description,
       'eventDate': eventDate.toIso8601String(),
-      'endDate': endDate?.toIso8601String(),   // ← НОВОЕ
+      'endDate': endDate?.toIso8601String(),
+      'startTime': startTime,        // ← НОВОЕ
+      'endTime': endTime,            // ← НОВОЕ
       'type': type,
       'linkedProjectId': linkedProjectId,
       'createdBy': createdBy,
