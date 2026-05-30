@@ -21,7 +21,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   final ProjectService _projectService = ProjectService();
   ProjectModel? _project;
   bool _isLoading = true;
-
   final _dateFormat = DateFormat('dd.MM.yyyy');
 
   @override
@@ -32,8 +31,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
   Future<void> _loadProject() async {
     setState(() => _isLoading = true);
-    final project =
-    await _projectService.getProjectById(widget.projectId);
+    final project = await _projectService.getProjectById(widget.projectId);
     setState(() {
       _project = project;
       _isLoading = false;
@@ -42,7 +40,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
   void _changeStatus() {
     if (_project == null) return;
-
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -59,8 +56,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 children: [
                   const Text(
                     'Изменить статус',
-                    style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold),
+                    style:
+                    TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const Spacer(),
                   IconButton(
@@ -86,9 +83,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                   title: Text(
                     entry.value,
                     style: TextStyle(
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+                      fontWeight:
+                      isSelected ? FontWeight.bold : FontWeight.normal,
                       color: isSelected
                           ? const Color(0xFF1565C0)
                           : Colors.black87,
@@ -163,8 +159,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     final role = currentUser?.role ?? 'student';
 
     // Права доступа
-    final canEdit = role == AppConstants.roleTeacher ||
-        role == AppConstants.roleAdmin;
+    final canEdit =
+        role == AppConstants.roleTeacher || role == AppConstants.roleAdmin;
     final canDelete = role == AppConstants.roleAdmin;
     final canUploadFiles = canEdit;
 
@@ -195,8 +191,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
     final p = _project!;
     final statusColor = _statusColor(p.status);
-    final statusName =
-        AppConstants.statusNames[p.status] ?? p.status;
+    final statusName = AppConstants.statusNames[p.status] ?? p.status;
 
     return Scaffold(
       appBar: AppBar(
@@ -232,7 +227,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               // ── СТАТУС + НАПРАВЛЕНИЕ ─────────────────
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -294,7 +288,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-
               if (p.shortDescription.isNotEmpty)
                 Text(
                   p.shortDescription,
@@ -307,13 +300,12 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
               const SizedBox(height: 20),
 
               // ── ИНФОРМАЦИОННЫЙ БЛОК ───────────────────
+              // FIX 1: ширина надписей увеличена со 100 до 120
               _infoCard([
                 _infoRow(
                   Icons.school_outlined,
                   'Организация',
-                  p.schoolName.isNotEmpty
-                      ? p.schoolName
-                      : 'Не указана',
+                  p.schoolName.isNotEmpty ? p.schoolName : 'Не указана',
                 ),
                 _dividerThin(),
                 _infoRow(
@@ -356,8 +348,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
               ],
 
               // ── УЧАСТНИКИ ─────────────────────────────
-              _sectionTitle(
-                  'Участники (${p.participants.length})'),
+              _sectionTitle('Участники (${p.participants.length})'),
               const SizedBox(height: 8),
               if (p.participants.isEmpty)
                 const Text(
@@ -381,8 +372,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                         children: [
                           ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: const Color(0xFF1565C0)
-                                  .withOpacity(0.12),
+                              backgroundColor:
+                              const Color(0xFF1565C0).withOpacity(0.12),
                               child: Text(
                                 participant.displayName.isNotEmpty
                                     ? participant.displayName[0]
@@ -434,8 +425,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                   ),
                   child: Text(
                     p.results,
-                    style: const TextStyle(
-                        fontSize: 14, height: 1.5),
+                    style:
+                    const TextStyle(fontSize: 14, height: 1.5),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -533,8 +524,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade200),
       ),
-      padding:
-      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: children,
@@ -542,6 +532,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     );
   }
 
+  // ── FIX 1: ширина надписей увеличена со 100 до 120 ──
   Widget _infoRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -551,11 +542,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
           Icon(icon, size: 18, color: Colors.grey.shade600),
           const SizedBox(width: 10),
           SizedBox(
-            width: 100,
+            width: 120, // ← было 100, стало 120
             child: Text(
               label,
-              style: TextStyle(
-                  color: Colors.grey.shade600, fontSize: 13),
+              style:
+              TextStyle(color: Colors.grey.shade600, fontSize: 13),
             ),
           ),
           Expanded(
