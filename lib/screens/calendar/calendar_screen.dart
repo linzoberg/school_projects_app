@@ -542,32 +542,31 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   const SizedBox(height: 20),
 
                   // ── Кнопка удаления ───────────────────────────
-                  // ── ИЗМЕНЕНО: canDelete вместо isAdmin ──
-                  if (widget.canDelete) ...[
-                    const Divider(),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          widget.onDelete();
-                        },
-                        icon: const Icon(Icons.delete_outline),
-                        label: const Text('Удалить мероприятие'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
-                          side: const BorderSide(color: Colors.red),
-                          padding:
-                          const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
+                  // if (widget.canDelete) ...[
+                  //   const Divider(),
+                  //   const SizedBox(height: 12),
+                  //   SizedBox(
+                  //     width: double.infinity,
+                  //     child: OutlinedButton.icon(
+                  //       onPressed: () {
+                  //         Navigator.pop(context);
+                  //         widget.onDelete();
+                  //       },
+                  //       icon: const Icon(Icons.delete_outline),
+                  //       label: const Text('Удалить мероприятие'),
+                  //       style: OutlinedButton.styleFrom(
+                  //         foregroundColor: Colors.red,
+                  //         side: const BorderSide(color: Colors.red),
+                  //         padding:
+                  //         const EdgeInsets.symmetric(vertical: 12),
+                  //         shape: RoundedRectangleBorder(
+                  //           borderRadius: BorderRadius.circular(10),
+                  //         ),
+                  //       ),
+                  //     ),
+                  //   ),
+                  //   const SizedBox(height: 8),
+                  // ],
                   const SizedBox(height: 16),
                 ],
               ),
@@ -1851,22 +1850,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             mainAxisAlignment:
                             MainAxisAlignment.start,
                             children: [
-                              // ── ИЗМЕНЕНО: canDeleteThis ──
-                              if (canDeleteThis)
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    color: Colors.red,
-                                    size: 20,
-                                  ),
-                                  tooltip: 'Удалить',
-                                  onPressed: () =>
-                                      _deleteEvent(event),
-                                  constraints:
-                                  const BoxConstraints(),
-                                  padding:
-                                  const EdgeInsets.all(4),
-                                ),
+                              // if (canDeleteThis)
+                              //   IconButton(
+                              //     icon: const Icon(
+                              //       Icons.delete_outline,
+                              //       color: Colors.red,
+                              //       size: 20,
+                              //     ),
+                              //     tooltip: 'Удалить',
+                              //     onPressed: () =>
+                              //         _deleteEvent(event),
+                              //     constraints:
+                              //     const BoxConstraints(),
+                              //     padding:
+                              //     const EdgeInsets.all(4),
+                              //   ),
                               const Icon(
                                 Icons.chevron_right,
                                 color: Colors.grey,
