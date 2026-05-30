@@ -5,11 +5,14 @@ class EventModel {
   final DateTime eventDate;       // дата начала
   final DateTime? endDate;        // дата завершения
   final String? startTime;        // время начала (формат "HH:mm")
-  final String? endTime;          // время завершения (формат "HH:mm")
+  final String? endTime;          // время завершение (формат "HH:mm")
   final String type;              // olympiad, contest, defense, trip, other
   final String? linkedProjectId;  // (оставлено для обратной совместимости)
   final List<String> linkedProjectIds; // ← НОВОЕ: список привязанных проектов
   final String createdBy;
+  // ── НОВОЕ: Руководитель мероприятия ──────────────────
+  final String supervisorId;
+  final String supervisorName;
 
   EventModel({
     required this.id,
@@ -23,6 +26,8 @@ class EventModel {
     this.linkedProjectId,
     this.linkedProjectIds = const [],
     required this.createdBy,
+    this.supervisorId = '',
+    this.supervisorName = '',
   });
 
   factory EventModel.fromMap(Map<String, dynamic> map, String id) {
@@ -51,6 +56,9 @@ class EventModel {
       linkedProjectId: map['linkedProjectId'],
       linkedProjectIds: projectIds,
       createdBy: map['createdBy'] ?? '',
+      // ── НОВОЕ: читаем руководителя ──
+      supervisorId: map['supervisorId'] ?? '',
+      supervisorName: map['supervisorName'] ?? '',
     );
   }
 
@@ -66,6 +74,9 @@ class EventModel {
       'linkedProjectId': linkedProjectId,
       'linkedProjectIds': linkedProjectIds,
       'createdBy': createdBy,
+      // ── НОВОЕ: сохраняем руководителя ──
+      'supervisorId': supervisorId,
+      'supervisorName': supervisorName,
     };
   }
 
@@ -82,6 +93,8 @@ class EventModel {
     String? linkedProjectId,
     List<String>? linkedProjectIds,
     String? createdBy,
+    String? supervisorId,
+    String? supervisorName,
   }) {
     return EventModel(
       id: id ?? this.id,
@@ -95,6 +108,8 @@ class EventModel {
       linkedProjectId: linkedProjectId ?? this.linkedProjectId,
       linkedProjectIds: linkedProjectIds ?? this.linkedProjectIds,
       createdBy: createdBy ?? this.createdBy,
+      supervisorId: supervisorId ?? this.supervisorId,
+      supervisorName: supervisorName ?? this.supervisorName,
     );
   }
 }

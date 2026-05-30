@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import '../../app_state.dart';
 import '../../models/event_model.dart';
 import '../../models/project_model.dart';
+import '../../models/user_model.dart';
+import '../../services/auth_service.dart';
 import '../../services/event_service.dart';
 import '../../services/project_service.dart';
 import '../../utils/constants.dart';
@@ -17,7 +19,9 @@ import '../projects/project_detail_screen.dart';
 class EventDetailScreen extends StatefulWidget {
   final EventModel event;
   final bool isAdmin;
-  final bool isAdminOrTeacher;
+  // ── ИЗМЕНЕНО: canEdit / canDelete вместо isAdminOrTeacher ──
+  final bool canEdit;
+  final bool canDelete;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -25,7 +29,8 @@ class EventDetailScreen extends StatefulWidget {
     super.key,
     required this.event,
     required this.isAdmin,
-    required this.isAdminOrTeacher,
+    required this.canEdit,
+    required this.canDelete,
     required this.onEdit,
     required this.onDelete,
   });
@@ -64,9 +69,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   // ── Добавление проекта к мероприятию ──────────────────
   Future<void> _addProject() async {
-    // Загружаем все проекты
     final allProjects = await _projectService.getProjects();
-    // Исключаем уже привязанные
     final available = allProjects
         .where((p) => !_event.linkedProjectIds.contains(p.id))
         .toList();
@@ -134,7 +137,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             ),
                             subtitle: Text(
                               '${project.direction} • ${project.schoolName}',
-                              style: const TextStyle(fontSize: 12),
+                              style:
+                              const TextStyle(fontSize: 12),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -219,8 +223,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final color = _eventColor(_event.type);
-    final typeName =
-        AppConstants.eventTypeNames[_event.type] ?? _event.type;
+    final typeName = AppConstants.eventTypeNames[_event.type] ?? _event.type;
     final dateFormat = DateFormat('dd MMMM yyyy', 'ru');
     final dateFormatShort = DateFormat('dd.MM.yyyy');
 
@@ -229,7 +232,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       appBar: AppBar(
         title: const Text('Карточка мероприятия'),
         actions: [
-          if (widget.isAdminOrTeacher)
+          // ── ИЗМЕНЕНО: используем canEdit вместо isAdminOrTeacher ──
+          if (widget.canEdit)
             IconButton(
               icon: const Icon(Icons.edit_outlined),
               tooltip: 'Редактировать',
@@ -238,7 +242,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 widget.onEdit();
               },
             ),
-          if (widget.isAdmin)
+          // ── ИЗМЕНЕНО: используем canDelete вместо isAdmin ──
+          if (widget.canDelete)
             IconButton(
               icon: const Icon(Icons.delete_outline),
               tooltip: 'Удалить',
@@ -270,7 +275,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Тип мероприятия — чип
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 5),
@@ -296,7 +300,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  // Название
                   Text(
                     _event.title,
                     style: const TextStyle(
@@ -307,7 +310,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // Дата начала в шапке
                   Row(
                     children: [
                       const Icon(Icons.calendar_today_outlined,
@@ -333,8 +335,17 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Даты и время ──────────────────────────────
+                  // ── НОВОЕ: Руководитель + Даты и время ────────
                   _infoCard([
+                    // ── НОВОЕ: Руководитель перед «Начало» ──
+                    if (_event.supervisorName.isNotEmpty) ...[
+                      _infoRow(
+                        Icons.person_outlined,
+                        'Руководитель',
+                        _event.supervisorName,
+                      ),
+                      _dividerThin(),
+                    ],
                     _infoRow(
                       Icons.play_circle_outline,
                       'Начало',
@@ -393,15 +404,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     const SizedBox(height: 20),
                   ],
 
-                  // ══════════════════════════════════════════════
-                  // FIX 2: Привязанные проекты
-                  // ══════════════════════════════════════════════
+                  // ── Привязанные проекты ─────────────────────
                   Row(
                     children: [
                       _sectionTitle(
                           'Проекты (${_linkedProjects.length})'),
                       const Spacer(),
-                      if (widget.isAdminOrTeacher)
+                      // ── ИЗМЕНЕНО: canEdit вместо isAdminOrTeacher ──
+                      if (widget.canEdit)
                         IconButton(
                           icon: const Icon(Icons.add_circle_outline,
                               color: Color(0xFF1565C0)),
@@ -484,10 +494,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    if (widget.isAdminOrTeacher)
+                                    // ── ИЗМЕНЕНО: canEdit ──
+                                    if (widget.canEdit)
                                       IconButton(
                                         icon: const Icon(
-                                          Icons.remove_circle_outline,
+                                          Icons
+                                              .remove_circle_outline,
                                           color: Colors.red,
                                           size: 20,
                                         ),
@@ -530,7 +542,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   const SizedBox(height: 20),
 
                   // ── Кнопка удаления ───────────────────────────
-                  if (widget.isAdmin) ...[
+                  // ── ИЗМЕНЕНО: canDelete вместо isAdmin ──
+                  if (widget.canDelete) ...[
                     const Divider(),
                     const SizedBox(height: 12),
                     SizedBox(
@@ -565,8 +578,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     );
   }
 
-  // ── Вспомогательные виджеты ─────────────────────────────
-
+  // ── Вспомогательные виджеты ───────────────────────────
   Widget _sectionTitle(String text) {
     return Text(
       text,
@@ -606,8 +618,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             width: 120,
             child: Text(
               label,
-              style:
-              TextStyle(color: Colors.grey.shade600, fontSize: 13),
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
             ),
           ),
           Expanded(
@@ -643,6 +654,7 @@ class CalendarScreen extends StatefulWidget {
 
 class _CalendarScreenState extends State<CalendarScreen> {
   final EventService _eventService = EventService();
+  final AuthService _authService = AuthService(); // ← НОВОЕ: для выбора руководителя
 
   DateTime _currentMonth = DateTime.now();
   DateTime? _selectedDay;
@@ -661,18 +673,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   static const List<String> _monthNames = [
-    'ЯНВАРЬ',
-    'ФЕВРАЛЬ',
-    'МАРТ',
-    'АПРЕЛЬ',
-    'МАЙ',
-    'ИЮНЬ',
-    'ИЮЛЬ',
-    'АВГУСТ',
-    'СЕНТЯБРЬ',
-    'ОКТЯБРЬ',
-    'НОЯБРЬ',
-    'ДЕКАБРЬ',
+    'ЯНВАРЬ', 'ФЕВРАЛЬ', 'МАРТ', 'АПРЕЛЬ',
+    'МАЙ', 'ИЮНЬ', 'ИЮЛЬ', 'АВГУСТ',
+    'СЕНТЯБРЬ', 'ОКТЯБРЬ', 'НОЯБРЬ', 'ДЕКАБРЬ',
   ];
 
   String _formatMonth(DateTime date) {
@@ -701,8 +704,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _previousMonth() {
     setState(() {
-      _currentMonth =
-          DateTime(_currentMonth.year, _currentMonth.month - 1);
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
       _selectedDay = null;
     });
     _loadEvents();
@@ -710,8 +712,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _nextMonth() {
     setState(() {
-      _currentMonth =
-          DateTime(_currentMonth.year, _currentMonth.month + 1);
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
       _selectedDay = null;
     });
     _loadEvents();
@@ -746,7 +747,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return null;
   }
 
-  // ── ДИАЛОГ СОЗДАНИЯ / РЕДАКТИРОВАНИЯ ─────────────────
+  // ══════════════════════════════════════════════════════
+  // ДИАЛОГ СОЗДАНИЯ / РЕДАКТИРОВАНИЯ МЕРОПРИЯТИЯ
+  // ══════════════════════════════════════════════════════
   void _showEventDialog({EventModel? existingEvent}) {
     final user = context.read<AppState>().currentUser;
     final isEditing = existingEvent != null;
@@ -766,6 +769,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
     String selectedType =
         existingEvent?.type ?? AppConstants.eventTypeContest;
 
+    // ── НОВОЕ: Руководитель мероприятия ────────────────
+    String supervisorId = existingEvent?.supervisorId ?? user?.id ?? '';
+    String supervisorName =
+        existingEvent?.supervisorName ?? user?.displayName ?? '';
+
     showDialog(
       context: context,
       builder: (context) {
@@ -775,8 +783,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               title: Text(
                 isEditing ? 'Редактировать' : 'Новое мероприятие',
               ),
-              contentPadding:
-              const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               content: SizedBox(
                 width: double.maxFinite,
                 child: SingleChildScrollView(
@@ -803,10 +810,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         maxLines: 2,
                       ),
                       const SizedBox(height: 10),
+
                       const Text(
                         'Тип мероприятия:',
-                        style:
-                        TextStyle(fontSize: 13, color: Colors.grey),
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
                       ),
                       const SizedBox(height: 6),
                       Wrap(
@@ -814,8 +821,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         runSpacing: 6,
                         children: AppConstants.eventTypeNames.entries
                             .map((entry) {
-                          final isSelected =
-                              selectedType == entry.key;
+                          final isSelected = selectedType == entry.key;
                           return GestureDetector(
                             onTap: () => setDialogState(
                                     () => selectedType = entry.key),
@@ -826,8 +832,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 color: isSelected
                                     ? const Color(0xFF1565C0)
                                     : Colors.grey.shade100,
-                                borderRadius:
-                                BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
                                   color: isSelected
                                       ? const Color(0xFF1565C0)
@@ -852,11 +857,201 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       ),
                       const SizedBox(height: 10),
 
+                      // ══════════════════════════════════════
+                      // НОВОЕ: Руководитель мероприятия
+                      // ══════════════════════════════════════
+                      const Text(
+                        'Руководитель:',
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 4),
+                      InkWell(
+                        onTap: () async {
+                          // Загружаем всех пользователей
+                          final allUsers =
+                          await _authService.getAllUsers();
+                          // Фильтруем — только руководители и админы
+                          final teachers = allUsers
+                              .where((u) =>
+                          u.role == AppConstants.roleTeacher ||
+                              u.role == AppConstants.roleAdmin)
+                              .toList();
+
+                          if (!context.mounted) return;
+
+                          final selected =
+                          await showDialog<UserModel>(
+                            context: context,
+                            builder: (ctx) {
+                              String search = '';
+                              return StatefulBuilder(
+                                builder: (ctx, setDlgState) {
+                                  final filtered =
+                                  teachers.where((u) {
+                                    if (search.isEmpty) return true;
+                                    final q = search.toLowerCase();
+                                    return u.displayName
+                                        .toLowerCase()
+                                        .contains(q) ||
+                                        u.email
+                                            .toLowerCase()
+                                            .contains(q);
+                                  }).toList();
+                                  return AlertDialog(
+                                    title: const Text(
+                                        'Выбрать руководителя'),
+                                    contentPadding:
+                                    const EdgeInsets.fromLTRB(
+                                        16, 12, 16, 0),
+                                    content: SizedBox(
+                                      width: double.maxFinite,
+                                      height: 350,
+                                      child: Column(
+                                        children: [
+                                          TextField(
+                                            decoration:
+                                            const InputDecoration(
+                                              hintText:
+                                              'Поиск...',
+                                              prefixIcon: Icon(
+                                                  Icons.search),
+                                              border:
+                                              OutlineInputBorder(),
+                                              isDense: true,
+                                            ),
+                                            onChanged: (v) =>
+                                                setDlgState(() =>
+                                                search = v),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Expanded(
+                                            child: filtered.isEmpty
+                                                ? const Center(
+                                              child: Text(
+                                                'Не найдено',
+                                                style: TextStyle(
+                                                    color: Colors
+                                                        .grey),
+                                              ),
+                                            )
+                                                : ListView.builder(
+                                              itemCount:
+                                              filtered
+                                                  .length,
+                                              itemBuilder:
+                                                  (ctx,
+                                                  idx) {
+                                                final u =
+                                                filtered[
+                                                idx];
+                                                return ListTile(
+                                                  leading:
+                                                  CircleAvatar(
+                                                    backgroundColor: const Color(
+                                                        0xFF1565C0)
+                                                        .withOpacity(
+                                                        0.15),
+                                                    child:
+                                                    Text(
+                                                      u.displayName.isNotEmpty
+                                                          ? u.displayName[0].toUpperCase()
+                                                          : '?',
+                                                      style:
+                                                      const TextStyle(
+                                                        color:
+                                                        Color(0xFF1565C0),
+                                                        fontWeight:
+                                                        FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  title: Text(
+                                                      u.displayName),
+                                                  subtitle:
+                                                  Text(
+                                                    u.email,
+                                                    style: const TextStyle(
+                                                        fontSize:
+                                                        11),
+                                                  ),
+                                                  onTap: () =>
+                                                      Navigator.pop(
+                                                          ctx,
+                                                          u),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx),
+                                        child:
+                                        const Text('Отмена'),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
+                            },
+                          );
+
+                          if (selected != null) {
+                            setDialogState(() {
+                              supervisorId = selected.id;
+                              supervisorName = selected.displayName;
+                            });
+                          }
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 12),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                                color: Colors.grey.shade400),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.person_outlined,
+                                  size: 18, color: Colors.grey),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  supervisorName.isNotEmpty
+                                      ? supervisorName
+                                      : 'Не выбран',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: supervisorName.isNotEmpty
+                                        ? Colors.black87
+                                        : Colors.grey,
+                                  ),
+                                ),
+                              ),
+                              if (supervisorName.isNotEmpty)
+                                GestureDetector(
+                                  onTap: () => setDialogState(() {
+                                    supervisorId = '';
+                                    supervisorName = '';
+                                  }),
+                                  child: const Icon(Icons.close,
+                                      size: 16, color: Colors.grey),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
                       // Дата начала
                       const Text(
                         'Дата начала:',
-                        style:
-                        TextStyle(fontSize: 13, color: Colors.grey),
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
                       ),
                       const SizedBox(height: 4),
                       InkWell(
@@ -868,8 +1063,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             lastDate: DateTime(2030),
                           );
                           if (picked != null) {
-                            setDialogState(
-                                    () => startDate = picked);
+                            setDialogState(() => startDate = picked);
                           }
                         },
                         child: Container(
@@ -877,22 +1071,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 12),
                           decoration: BoxDecoration(
-                            border: Border.all(
-                                color: Colors.grey.shade400),
+                            border:
+                            Border.all(color: Colors.grey.shade400),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Row(
                             children: [
-                              const Icon(
-                                Icons.play_circle_outline,
-                                size: 18,
-                                color: Colors.grey,
-                              ),
+                              const Icon(Icons.play_circle_outline,
+                                  size: 18, color: Colors.grey),
                               const SizedBox(width: 8),
                               Text(
                                 _dateFormat.format(startDate),
-                                style:
-                                const TextStyle(fontSize: 15),
+                                style: const TextStyle(fontSize: 15),
                               ),
                             ],
                           ),
@@ -903,8 +1093,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       // Время начала
                       const Text(
                         'Время начала (необязательно):',
-                        style:
-                        TextStyle(fontSize: 13, color: Colors.grey),
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
                       ),
                       const SizedBox(height: 4),
                       InkWell(
@@ -912,8 +1101,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           final picked =
                           await _pickTime(context, startTime);
                           if (picked != null) {
-                            setDialogState(
-                                    () => startTime = picked);
+                            setDialogState(() => startTime = picked);
                           }
                         },
                         child: Container(
@@ -921,17 +1109,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 12),
                           decoration: BoxDecoration(
-                            border: Border.all(
-                                color: Colors.grey.shade400),
+                            border:
+                            Border.all(color: Colors.grey.shade400),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Row(
                             children: [
-                              const Icon(
-                                Icons.access_time_outlined,
-                                size: 18,
-                                color: Colors.grey,
-                              ),
+                              const Icon(Icons.access_time_outlined,
+                                  size: 18, color: Colors.grey),
                               const SizedBox(width: 8),
                               Text(
                                 startTime ?? 'Не указано',
@@ -948,8 +1133,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   onTap: () => setDialogState(
                                           () => startTime = null),
                                   child: const Icon(Icons.close,
-                                      size: 16,
-                                      color: Colors.grey),
+                                      size: 16, color: Colors.grey),
                                 ),
                               ],
                             ],
@@ -961,8 +1145,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       // Дата завершения
                       const Text(
                         'Дата завершения (необязательно):',
-                        style:
-                        TextStyle(fontSize: 13, color: Colors.grey),
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
                       ),
                       const SizedBox(height: 4),
                       InkWell(
@@ -974,8 +1157,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             lastDate: DateTime(2030),
                           );
                           if (picked != null) {
-                            setDialogState(
-                                    () => endDate = picked);
+                            setDialogState(() => endDate = picked);
                           }
                         },
                         child: Container(
@@ -983,17 +1165,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 12),
                           decoration: BoxDecoration(
-                            border: Border.all(
-                                color: Colors.grey.shade400),
+                            border:
+                            Border.all(color: Colors.grey.shade400),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Row(
                             children: [
-                              const Icon(
-                                Icons.stop_circle_outlined,
-                                size: 18,
-                                color: Colors.grey,
-                              ),
+                              const Icon(Icons.stop_circle_outlined,
+                                  size: 18, color: Colors.grey),
                               const SizedBox(width: 8),
                               Text(
                                 endDate != null
@@ -1012,8 +1191,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   onTap: () => setDialogState(
                                           () => endDate = null),
                                   child: const Icon(Icons.close,
-                                      size: 16,
-                                      color: Colors.grey),
+                                      size: 16, color: Colors.grey),
                                 ),
                               ],
                             ],
@@ -1025,8 +1203,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       // Время завершения
                       const Text(
                         'Время завершения (необязательно):',
-                        style:
-                        TextStyle(fontSize: 13, color: Colors.grey),
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
                       ),
                       const SizedBox(height: 4),
                       InkWell(
@@ -1034,8 +1211,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           final picked =
                           await _pickTime(context, endTime);
                           if (picked != null) {
-                            setDialogState(
-                                    () => endTime = picked);
+                            setDialogState(() => endTime = picked);
                           }
                         },
                         child: Container(
@@ -1043,17 +1219,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 12),
                           decoration: BoxDecoration(
-                            border: Border.all(
-                                color: Colors.grey.shade400),
+                            border:
+                            Border.all(color: Colors.grey.shade400),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Row(
                             children: [
                               const Icon(
-                                Icons.access_time_filled_outlined,
-                                size: 18,
-                                color: Colors.grey,
-                              ),
+                                  Icons.access_time_filled_outlined,
+                                  size: 18,
+                                  color: Colors.grey),
                               const SizedBox(width: 8),
                               Text(
                                 endTime ?? 'Не указано',
@@ -1070,8 +1245,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   onTap: () => setDialogState(
                                           () => endTime = null),
                                   child: const Icon(Icons.close,
-                                      size: 16,
-                                      color: Colors.grey),
+                                      size: 16, color: Colors.grey),
                                 ),
                               ],
                             ],
@@ -1113,6 +1287,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         linkedProjectIds:
                         existingEvent.linkedProjectIds,
                         createdBy: existingEvent.createdBy,
+                        // ── НОВОЕ: руководитель ──
+                        supervisorId: supervisorId,
+                        supervisorName: supervisorName,
                       );
                       await _eventService.updateEvent(updated);
                     } else {
@@ -1126,14 +1303,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         endTime: endTime,
                         type: selectedType,
                         createdBy: user?.id ?? '',
+                        // ── НОВОЕ: руководитель ──
+                        supervisorId: supervisorId,
+                        supervisorName: supervisorName,
                       );
                       await _eventService.createEvent(event);
                     }
+
                     if (context.mounted) Navigator.pop(context);
                     _loadEvents();
                   },
-                  child:
-                  Text(isEditing ? 'Сохранить' : 'Создать'),
+                  child: Text(isEditing ? 'Сохранить' : 'Создать'),
                 ),
               ],
             );
@@ -1168,15 +1348,40 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  void _openEventDetail(
-      EventModel event, bool isAdminOrTeacher, bool isAdmin) {
+  // ══════════════════════════════════════════════════════
+  // НОВОЕ: Вычисление прав canEdit / canDelete
+  // Руководитель может редактировать / удалять только
+  // СВОИ мероприятия (где он createdBy или supervisorId)
+  // ══════════════════════════════════════════════════════
+  bool _canEditEvent(EventModel event, String? userId, String? role) {
+    if (role == AppConstants.roleAdmin) return true;
+    if (role == AppConstants.roleTeacher) {
+      return event.createdBy == userId || event.supervisorId == userId;
+    }
+    return false;
+  }
+
+  bool _canDeleteEvent(EventModel event, String? userId, String? role) {
+    if (role == AppConstants.roleAdmin) return true;
+    if (role == AppConstants.roleTeacher) {
+      return event.createdBy == userId || event.supervisorId == userId;
+    }
+    return false;
+  }
+
+  void _openEventDetail(EventModel event, String? userId, String? role) {
+    final isAdmin = role == AppConstants.roleAdmin;
+    final canEdit = _canEditEvent(event, userId, role);
+    final canDelete = _canDeleteEvent(event, userId, role);
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => EventDetailScreen(
           event: event,
           isAdmin: isAdmin,
-          isAdminOrTeacher: isAdminOrTeacher,
+          canEdit: canEdit,
+          canDelete: canDelete,
           onEdit: () => _showEventDialog(existingEvent: event),
           onDelete: () => _deleteEvent(event),
         ),
@@ -1217,9 +1422,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AppState>().currentUser;
-    final isAdminOrTeacher = user?.role == AppConstants.roleAdmin ||
-        user?.role == AppConstants.roleTeacher;
-    final isAdmin = user?.role == AppConstants.roleAdmin;
+    final role = user?.role;
+    final userId = user?.id;
+    final isAdminOrTeacher = role == AppConstants.roleAdmin ||
+        role == AppConstants.roleTeacher;
 
     return Scaffold(
       body: Column(
@@ -1232,8 +1438,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.chevron_left,
-                      color: Colors.white),
+                  icon:
+                  const Icon(Icons.chevron_left, color: Colors.white),
                   onPressed: _previousMonth,
                 ),
                 Text(
@@ -1285,13 +1491,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ],
             ),
           ),
+
           const Divider(height: 1),
 
           // Список мероприятий
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _buildEventsList(isAdminOrTeacher, isAdmin),
+                : _buildEventsList(userId, role),
           ),
         ],
       ),
@@ -1308,14 +1515,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Widget _buildCalendarGrid() {
-    final firstDay =
-    DateTime(_currentMonth.year, _currentMonth.month, 1);
+    final firstDay = DateTime(_currentMonth.year, _currentMonth.month, 1);
     int startWeekday = firstDay.weekday - 1;
-    final daysInMonth = DateTime(
-        _currentMonth.year, _currentMonth.month + 1, 0)
-        .day;
-    final today = DateTime.now();
+    final daysInMonth =
+        DateTime(_currentMonth.year, _currentMonth.month + 1, 0).day;
 
+    final today = DateTime.now();
     final List<Widget> dayCells = [];
 
     for (int i = 0; i < startWeekday; i++) {
@@ -1323,8 +1528,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
 
     for (int day = 1; day <= daysInMonth; day++) {
-      final date = DateTime(
-          _currentMonth.year, _currentMonth.month, day);
+      final date =
+      DateTime(_currentMonth.year, _currentMonth.month, day);
+      final dayEvents = _eventsForDay(date);
       final isToday = date.year == today.year &&
           date.month == today.month &&
           date.day == today.day;
@@ -1332,13 +1538,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
           date.year == _selectedDay!.year &&
           date.month == _selectedDay!.month &&
           date.day == _selectedDay!.day;
-      final dayEvents = _eventsForDay(date);
 
       dayCells.add(
         GestureDetector(
           onTap: () {
             setState(() {
-              _selectedDay = date;
+              _selectedDay = isSelected ? null : date;
             });
           },
           child: Container(
@@ -1347,12 +1552,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
               color: isSelected
                   ? const Color(0xFF1565C0)
                   : isToday
-                  ? const Color(0xFF1565C0).withOpacity(0.1)
+                  ? const Color(0xFF1565C0).withOpacity(0.12)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
               border: isToday && !isSelected
                   ? Border.all(
-                  color: const Color(0xFF1565C0), width: 1)
+                  color: const Color(0xFF1565C0), width: 1.5)
                   : null,
             ),
             child: Column(
@@ -1361,15 +1566,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 Text(
                   '$day',
                   style: TextStyle(
+                    fontSize: 14,
+                    fontWeight:
+                    isToday ? FontWeight.bold : FontWeight.normal,
                     color: isSelected
                         ? Colors.white
                         : isToday
                         ? const Color(0xFF1565C0)
                         : Colors.black87,
-                    fontWeight: isToday || isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                    fontSize: 14,
                   ),
                 ),
                 Row(
@@ -1408,14 +1612,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   // ══════════════════════════════════════════════════════
-  // FIX 3: Переработанный список мероприятий в календаре
-  // Строка 1: Название
-  // Строка 2: Тип
-  // Строка 3: Начало, Время начала
-  // Строка 4: Завершение, Время завершения
-  // Строка 5: Описание
+  // СПИСОК МЕРОПРИЯТИЙ (ОБНОВЛЕНО для прав доступа)
   // ══════════════════════════════════════════════════════
-  Widget _buildEventsList(bool isAdminOrTeacher, bool isAdmin) {
+  Widget _buildEventsList(String? userId, String? role) {
     final List<EventModel> displayEvents;
     String headerText;
 
@@ -1427,6 +1626,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
       displayEvents = _events;
       headerText = 'Все мероприятия месяца';
     }
+
+    final isAdmin = role == AppConstants.roleAdmin;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1489,14 +1690,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
               itemCount: displayEvents.length,
-              separatorBuilder: (_, __) =>
-              const SizedBox(height: 4),
+              separatorBuilder: (_, __) => const SizedBox(height: 4),
               itemBuilder: (context, index) {
                 final event = displayEvents[index];
                 final color = _eventColor(event.type);
                 final typeName =
                     AppConstants.eventTypeNames[event.type] ??
                         event.type;
+
+                // ── ИЗМЕНЕНО: вычисляем права для каждого элемента ──
+                final canDeleteThis =
+                _canDeleteEvent(event, userId, role);
 
                 return Card(
                   elevation: 0,
@@ -1506,19 +1710,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(10),
-                    onTap: () => _openEventDetail(
-                        event, isAdminOrTeacher, isAdmin),
+                    onTap: () =>
+                        _openEventDetail(event, userId, role),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 10),
                       child: Row(
-                        crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Иконка слева
                           Padding(
-                            padding:
-                            const EdgeInsets.only(top: 2),
+                            padding: const EdgeInsets.only(top: 2),
                             child: CircleAvatar(
                               backgroundColor:
                               color.withOpacity(0.15),
@@ -1531,13 +1732,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          // Контент по центру
                           Expanded(
                             child: Column(
                               crossAxisAlignment:
                               CrossAxisAlignment.start,
                               children: [
-                                // Строка 1: Название
                                 Text(
                                   event.title,
                                   style: const TextStyle(
@@ -1545,11 +1744,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                     fontSize: 14,
                                   ),
                                   maxLines: 2,
-                                  overflow:
-                                  TextOverflow.ellipsis,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 3),
-                                // Строка 2: Тип
                                 Text(
                                   typeName,
                                   style: TextStyle(
@@ -1559,46 +1756,39 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 3),
-                                // Строка 3: Начало, Время начала
                                 Row(
                                   children: [
                                     const Icon(
-                                      Icons
-                                          .play_circle_outline,
-                                      size: 12,
-                                      color: Colors.grey,
-                                    ),
+                                        Icons.play_circle_outline,
+                                        size: 12,
+                                        color: Colors.grey),
                                     const SizedBox(width: 4),
                                     Text(
-                                      _dateFormat.format(
-                                          event.eventDate),
+                                      _dateFormat
+                                          .format(event.eventDate),
                                       style: const TextStyle(
                                           fontSize: 12,
                                           color: Colors.grey),
                                     ),
-                                    if (event.startTime !=
-                                        null &&
+                                    if (event.startTime != null &&
                                         event.startTime!
                                             .isNotEmpty) ...[
                                       const SizedBox(width: 8),
                                       const Icon(
-                                        Icons
-                                            .access_time_outlined,
-                                        size: 12,
-                                        color: Colors.grey,
-                                      ),
+                                          Icons
+                                              .access_time_outlined,
+                                          size: 12,
+                                          color: Colors.grey),
                                       const SizedBox(width: 2),
                                       Text(
                                         event.startTime!,
                                         style: const TextStyle(
                                             fontSize: 12,
-                                            color:
-                                            Colors.grey),
+                                            color: Colors.grey),
                                       ),
                                     ],
                                   ],
                                 ),
-                                // Строка 4: Завершение, Время завершения
                                 if (event.endDate != null ||
                                     (event.endTime != null &&
                                         event.endTime!
@@ -1609,50 +1799,39 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                       if (event.endDate !=
                                           null) ...[
                                         const Icon(
-                                          Icons
-                                              .stop_circle_outlined,
-                                          size: 12,
-                                          color: Colors.grey,
-                                        ),
-                                        const SizedBox(
-                                            width: 4),
+                                            Icons
+                                                .stop_circle_outlined,
+                                            size: 12,
+                                            color: Colors.grey),
+                                        const SizedBox(width: 4),
                                         Text(
                                           _dateFormat.format(
                                               event.endDate!),
-                                          style:
-                                          const TextStyle(
+                                          style: const TextStyle(
                                               fontSize: 12,
-                                              color: Colors
-                                                  .grey),
+                                              color: Colors.grey),
                                         ),
                                       ],
-                                      if (event.endTime !=
-                                          null &&
+                                      if (event.endTime != null &&
                                           event.endTime!
                                               .isNotEmpty) ...[
-                                        const SizedBox(
-                                            width: 8),
+                                        const SizedBox(width: 8),
                                         const Icon(
-                                          Icons
-                                              .access_time_filled_outlined,
-                                          size: 12,
-                                          color: Colors.grey,
-                                        ),
-                                        const SizedBox(
-                                            width: 2),
+                                            Icons
+                                                .access_time_filled_outlined,
+                                            size: 12,
+                                            color: Colors.grey),
+                                        const SizedBox(width: 2),
                                         Text(
                                           event.endTime!,
-                                          style:
-                                          const TextStyle(
+                                          style: const TextStyle(
                                               fontSize: 12,
-                                              color: Colors
-                                                  .grey),
+                                              color: Colors.grey),
                                         ),
                                       ],
                                     ],
                                   ),
                                 ],
-                                // Строка 5: Описание
                                 if (event.description
                                     .isNotEmpty) ...[
                                   const SizedBox(height: 3),
@@ -1662,19 +1841,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                         fontSize: 12,
                                         color: Colors.black54),
                                     maxLines: 1,
-                                    overflow:
-                                    TextOverflow.ellipsis,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ],
                             ),
                           ),
-                          // Кнопки справа
                           Column(
                             mainAxisAlignment:
                             MainAxisAlignment.start,
                             children: [
-                              if (isAdmin)
+                              // ── ИЗМЕНЕНО: canDeleteThis ──
+                              if (canDeleteThis)
                                 IconButton(
                                   icon: const Icon(
                                     Icons.delete_outline,

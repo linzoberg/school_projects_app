@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+
 import '../../app_state.dart';
 import '../../models/project_model.dart';
 import '../../services/project_service.dart';
@@ -157,12 +158,34 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     final appState = context.read<AppState>();
     final currentUser = appState.currentUser;
     final role = currentUser?.role ?? 'student';
+    final userId = currentUser?.id ?? '';
 
-    // Права доступа
-    final canEdit =
-        role == AppConstants.roleTeacher || role == AppConstants.roleAdmin;
-    final canDelete = role == AppConstants.roleAdmin;
-    final canUploadFiles = canEdit;
+    // ══════════════════════════════════════════════════
+    // ИЗМЕНЕНО: Права доступа с учётом владения проектом
+    // Админ — может всё
+    // Руководитель — может редактировать ТОЛЬКО свои проекты
+    //   (где supervisorId совпадает с userId)
+    // Ученик — только просмотр
+    // ══════════════════════════════════════════════════
+    bool canEdit;
+    bool canDelete;
+    bool canUploadFiles;
+
+    if (role == AppConstants.roleAdmin) {
+      canEdit = true;
+      canDelete = true;
+      canUploadFiles = true;
+    } else if (role == AppConstants.roleTeacher) {
+      // Руководитель может редактировать только СВОИ проекты
+      final isOwner = _project != null && _project!.supervisorId == userId;
+      canEdit = isOwner;
+      canDelete = false; // удалять может только админ
+      canUploadFiles = isOwner;
+    } else {
+      canEdit = false;
+      canDelete = false;
+      canUploadFiles = false;
+    }
 
     if (_isLoading) {
       return const Scaffold(
@@ -300,7 +323,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
               const SizedBox(height: 20),
 
               // ── ИНФОРМАЦИОННЫЙ БЛОК ───────────────────
-              // FIX 1: ширина надписей увеличена со 100 до 120
               _infoCard([
                 _infoRow(
                   Icons.school_outlined,
@@ -372,8 +394,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                         children: [
                           ListTile(
                             leading: CircleAvatar(
-                              backgroundColor:
-                              const Color(0xFF1565C0).withOpacity(0.12),
+                              backgroundColor: const Color(0xFF1565C0)
+                                  .withOpacity(0.12),
                               child: Text(
                                 participant.displayName.isNotEmpty
                                     ? participant.displayName[0]
@@ -504,7 +526,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   }
 
   // ── Вспомогательные виджеты ───────────────────────────
-
   Widget _sectionTitle(String text) {
     return Text(
       text,
@@ -532,7 +553,6 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     );
   }
 
-  // ── FIX 1: ширина надписей увеличена со 100 до 120 ──
   Widget _infoRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -542,11 +562,10 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
           Icon(icon, size: 18, color: Colors.grey.shade600),
           const SizedBox(width: 10),
           SizedBox(
-            width: 120, // ← было 100, стало 120
+            width: 120,
             child: Text(
               label,
-              style:
-              TextStyle(color: Colors.grey.shade600, fontSize: 13),
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
             ),
           ),
           Expanded(
