@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+
 import '../../app_state.dart';
 import '../../models/event_model.dart';
+import '../../models/project_model.dart';
 import '../../services/event_service.dart';
+import '../../services/project_service.dart';
 import '../../utils/constants.dart';
+import '../projects/project_detail_screen.dart';
 
 // ═══════════════════════════════════════════════════════
-//  КАРТОЧКА МЕРОПРИЯТИЯ
+// КАРТОЧКА МЕРОПРИЯТИЯ
 // ═══════════════════════════════════════════════════════
 
-class EventDetailScreen extends StatelessWidget {
+class EventDetailScreen extends StatefulWidget {
   final EventModel event;
   final bool isAdmin;
   final bool isAdminOrTeacher;
@@ -25,6 +29,162 @@ class EventDetailScreen extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
   });
+
+  @override
+  State<EventDetailScreen> createState() => _EventDetailScreenState();
+}
+
+class _EventDetailScreenState extends State<EventDetailScreen> {
+  final ProjectService _projectService = ProjectService();
+  final EventService _eventService = EventService();
+
+  late EventModel _event;
+  List<ProjectModel> _linkedProjects = [];
+  bool _isLoadingProjects = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _event = widget.event;
+    _loadLinkedProjects();
+  }
+
+  Future<void> _loadLinkedProjects() async {
+    setState(() => _isLoadingProjects = true);
+    final List<ProjectModel> projects = [];
+    for (final pid in _event.linkedProjectIds) {
+      final p = await _projectService.getProjectById(pid);
+      if (p != null) projects.add(p);
+    }
+    setState(() {
+      _linkedProjects = projects;
+      _isLoadingProjects = false;
+    });
+  }
+
+  // ── Добавление проекта к мероприятию ──────────────────
+  Future<void> _addProject() async {
+    // Загружаем все проекты
+    final allProjects = await _projectService.getProjects();
+    // Исключаем уже привязанные
+    final available = allProjects
+        .where((p) => !_event.linkedProjectIds.contains(p.id))
+        .toList();
+
+    if (!mounted) return;
+
+    final selected = await showDialog<ProjectModel>(
+      context: context,
+      builder: (context) {
+        String search = '';
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final filtered = available.where((p) {
+              if (search.isEmpty) return true;
+              final q = search.toLowerCase();
+              return p.title.toLowerCase().contains(q) ||
+                  p.schoolName.toLowerCase().contains(q) ||
+                  p.supervisorName.toLowerCase().contains(q);
+            }).toList();
+
+            return AlertDialog(
+              title: const Text('Добавить проект'),
+              contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              content: SizedBox(
+                width: double.maxFinite,
+                height: 400,
+                child: Column(
+                  children: [
+                    TextField(
+                      decoration: const InputDecoration(
+                        hintText: 'Поиск проекта...',
+                        prefixIcon: Icon(Icons.search),
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      onChanged: (v) => setDialogState(() => search = v),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? const Center(
+                        child: Text(
+                          'Нет доступных проектов',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      )
+                          : ListView.separated(
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) =>
+                        const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final project = filtered[index];
+                          return ListTile(
+                            contentPadding:
+                            const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            title: Text(
+                              project.title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              '${project.direction} • ${project.schoolName}',
+                              style: const TextStyle(fontSize: 12),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: const Icon(
+                              Icons.add_circle_outline,
+                              color: Color(0xFF1565C0),
+                            ),
+                            onTap: () =>
+                                Navigator.pop(context, project),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Отмена'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (selected != null) {
+      final updatedIds = [..._event.linkedProjectIds, selected.id];
+      final updated = _event.copyWith(linkedProjectIds: updatedIds);
+      await _eventService.updateEvent(updated);
+      setState(() {
+        _event = updated;
+      });
+      _loadLinkedProjects();
+    }
+  }
+
+  // ── Удаление проекта из мероприятия ───────────────────
+  Future<void> _removeProject(String projectId) async {
+    final updatedIds =
+    _event.linkedProjectIds.where((id) => id != projectId).toList();
+    final updated = _event.copyWith(linkedProjectIds: updatedIds);
+    await _eventService.updateEvent(updated);
+    setState(() {
+      _event = updated;
+    });
+    _loadLinkedProjects();
+  }
 
   Color _eventColor(String type) {
     switch (type) {
@@ -58,9 +218,9 @@ class EventDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _eventColor(event.type);
+    final color = _eventColor(_event.type);
     final typeName =
-        AppConstants.eventTypeNames[event.type] ?? event.type;
+        AppConstants.eventTypeNames[_event.type] ?? _event.type;
     final dateFormat = DateFormat('dd MMMM yyyy', 'ru');
     final dateFormatShort = DateFormat('dd.MM.yyyy');
 
@@ -69,27 +229,26 @@ class EventDetailScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Карточка мероприятия'),
         actions: [
-          if (isAdminOrTeacher)
+          if (widget.isAdminOrTeacher)
             IconButton(
               icon: const Icon(Icons.edit_outlined),
               tooltip: 'Редактировать',
               onPressed: () {
                 Navigator.pop(context);
-                onEdit();
+                widget.onEdit();
               },
             ),
-          if (isAdmin)
+          if (widget.isAdmin)
             IconButton(
               icon: const Icon(Icons.delete_outline),
               tooltip: 'Удалить',
               onPressed: () {
                 Navigator.pop(context);
-                onDelete();
+                widget.onDelete();
               },
             ),
         ],
       ),
-
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,7 +281,7 @@ class EventDetailScreen extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(_eventIcon(event.type),
+                        Icon(_eventIcon(_event.type),
                             color: Colors.white, size: 16),
                         const SizedBox(width: 6),
                         Text(
@@ -136,12 +295,10 @@ class EventDetailScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 14),
-
                   // Название
                   Text(
-                    event.title,
+                    _event.title,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 22,
@@ -149,9 +306,7 @@ class EventDetailScreen extends StatelessWidget {
                       height: 1.3,
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
                   // Дата начала в шапке
                   Row(
                     children: [
@@ -159,7 +314,7 @@ class EventDetailScreen extends StatelessWidget {
                           color: Colors.white70, size: 16),
                       const SizedBox(width: 6),
                       Text(
-                        dateFormat.format(event.eventDate),
+                        dateFormat.format(_event.eventDate),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,
@@ -178,51 +333,44 @@ class EventDetailScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ────────────────────────────────────────────
-                  // ПАТЧ 2 + 3: Даты и ВРЕМЯ начала/завершения
-                  // Ширина надписей увеличена с 80 до 120
-                  // Добавлены строки "Время начала" и "Время завершения"
-                  // ────────────────────────────────────────────
+                  // ── Даты и время ──────────────────────────────
                   _infoCard([
                     _infoRow(
                       Icons.play_circle_outline,
                       'Начало',
-                      dateFormatShort.format(event.eventDate),
+                      dateFormatShort.format(_event.eventDate),
                     ),
-                    // ── ПАТЧ 2: Время начала ──
-                    if (event.startTime != null &&
-                        event.startTime!.isNotEmpty) ...[
+                    if (_event.startTime != null &&
+                        _event.startTime!.isNotEmpty) ...[
                       _dividerThin(),
                       _infoRow(
                         Icons.access_time_outlined,
                         'Время начала',
-                        event.startTime!,
+                        _event.startTime!,
                       ),
                     ],
-                    if (event.endDate != null) ...[
+                    if (_event.endDate != null) ...[
                       _dividerThin(),
                       _infoRow(
                         Icons.stop_circle_outlined,
                         'Завершение',
-                        dateFormatShort.format(event.endDate!),
+                        dateFormatShort.format(_event.endDate!),
                       ),
                     ],
-                    // ── ПАТЧ 2: Время завершения ──
-                    if (event.endTime != null &&
-                        event.endTime!.isNotEmpty) ...[
+                    if (_event.endTime != null &&
+                        _event.endTime!.isNotEmpty) ...[
                       _dividerThin(),
                       _infoRow(
                         Icons.access_time_filled_outlined,
                         'Время завершения',
-                        event.endTime!,
+                        _event.endTime!,
                       ),
                     ],
                   ]),
-
                   const SizedBox(height: 20),
 
-                  // ── ПАТЧ 4: «Описание» → «Описание мероприятия» ──
-                  if (event.description.isNotEmpty) ...[
+                  // ── Описание мероприятия ───────────────────────
+                  if (_event.description.isNotEmpty) ...[
                     _sectionTitle('Описание мероприятия'),
                     const SizedBox(height: 8),
                     Container(
@@ -231,11 +379,10 @@ class EventDetailScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(12),
-                        border:
-                        Border.all(color: Colors.grey.shade200),
+                        border: Border.all(color: Colors.grey.shade200),
                       ),
                       child: Text(
-                        event.description,
+                        _event.description,
                         style: const TextStyle(
                           fontSize: 14,
                           height: 1.6,
@@ -246,7 +393,144 @@ class EventDetailScreen extends StatelessWidget {
                     const SizedBox(height: 20),
                   ],
 
-                  if (isAdmin) ...[
+                  // ══════════════════════════════════════════════
+                  // FIX 2: Привязанные проекты
+                  // ══════════════════════════════════════════════
+                  Row(
+                    children: [
+                      _sectionTitle(
+                          'Проекты (${_linkedProjects.length})'),
+                      const Spacer(),
+                      if (widget.isAdminOrTeacher)
+                        IconButton(
+                          icon: const Icon(Icons.add_circle_outline,
+                              color: Color(0xFF1565C0)),
+                          tooltip: 'Добавить проект',
+                          onPressed: _addProject,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  if (_isLoadingProjects)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  else if (_linkedProjects.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: const Text(
+                        'Проекты не привязаны',
+                        style: TextStyle(color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
+                    )
+                  else
+                    Card(
+                      elevation: 0,
+                      color: Colors.grey.shade50,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        children: List.generate(
+                            _linkedProjects.length, (i) {
+                          final project = _linkedProjects[i];
+                          final isLast =
+                              i == _linkedProjects.length - 1;
+                          final statusName =
+                              AppConstants.statusNames[project.status] ??
+                                  project.status;
+                          return Column(
+                            children: [
+                              ListTile(
+                                contentPadding:
+                                const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 4),
+                                leading: CircleAvatar(
+                                  backgroundColor:
+                                  const Color(0xFF1565C0)
+                                      .withOpacity(0.12),
+                                  child: const Icon(
+                                    Icons.assignment_outlined,
+                                    color: Color(0xFF1565C0),
+                                    size: 20,
+                                  ),
+                                ),
+                                title: Text(
+                                  project.title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                subtitle: Text(
+                                  '$statusName • ${project.direction}',
+                                  style:
+                                  const TextStyle(fontSize: 12),
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (widget.isAdminOrTeacher)
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.remove_circle_outline,
+                                          color: Colors.red,
+                                          size: 20,
+                                        ),
+                                        tooltip: 'Убрать проект',
+                                        onPressed: () =>
+                                            _removeProject(
+                                                project.id),
+                                      ),
+                                    const Icon(
+                                      Icons.chevron_right,
+                                      color: Colors.grey,
+                                      size: 20,
+                                    ),
+                                  ],
+                                ),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          ProjectDetailScreen(
+                                            projectId: project.id,
+                                          ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              if (!isLast)
+                                Divider(
+                                  height: 1,
+                                  indent: 16,
+                                  endIndent: 16,
+                                  color: Colors.grey.shade200,
+                                ),
+                            ],
+                          );
+                        }),
+                      ),
+                    ),
+                  const SizedBox(height: 20),
+
+                  // ── Кнопка удаления ───────────────────────────
+                  if (widget.isAdmin) ...[
                     const Divider(),
                     const SizedBox(height: 12),
                     SizedBox(
@@ -254,15 +538,15 @@ class EventDetailScreen extends StatelessWidget {
                       child: OutlinedButton.icon(
                         onPressed: () {
                           Navigator.pop(context);
-                          onDelete();
+                          widget.onDelete();
                         },
                         icon: const Icon(Icons.delete_outline),
                         label: const Text('Удалить мероприятие'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.red,
                           side: const BorderSide(color: Colors.red),
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 12),
+                          padding:
+                          const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -271,7 +555,6 @@ class EventDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                   ],
-
                   const SizedBox(height: 16),
                 ],
               ),
@@ -303,8 +586,7 @@ class EventDetailScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade200),
       ),
-      padding:
-      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: children,
@@ -312,7 +594,6 @@ class EventDetailScreen extends StatelessWidget {
     );
   }
 
-  // ── ПАТЧ 3: ширина надписей увеличена с 80 до 120 ──
   Widget _infoRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -322,11 +603,11 @@ class EventDetailScreen extends StatelessWidget {
           Icon(icon, size: 18, color: Colors.grey.shade600),
           const SizedBox(width: 10),
           SizedBox(
-            width: 120,  // ← было 80, стало 120
+            width: 120,
             child: Text(
               label,
-              style: TextStyle(
-                  color: Colors.grey.shade600, fontSize: 13),
+              style:
+              TextStyle(color: Colors.grey.shade600, fontSize: 13),
             ),
           ),
           Expanded(
@@ -350,7 +631,7 @@ class EventDetailScreen extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════
-//  ЭКРАН КАЛЕНДАРЯ
+// ЭКРАН КАЛЕНДАРЯ
 // ═══════════════════════════════════════════════════════
 
 class CalendarScreen extends StatefulWidget {
@@ -367,6 +648,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   DateTime? _selectedDay;
   List<EventModel> _events = [];
   bool _isLoading = true;
+
   late DateFormat _dateFormat;
   late DateFormat _timeFormat;
 
@@ -436,7 +718,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   // ── Вспомогательный метод для выбора времени ─────────
-  Future<String?> _pickTime(BuildContext context, String? currentTime) async {
+  Future<String?> _pickTime(
+      BuildContext context, String? currentTime) async {
     TimeOfDay initial = const TimeOfDay(hour: 9, minute: 0);
     if (currentTime != null && currentTime.contains(':')) {
       final parts = currentTime.split(':');
@@ -475,16 +758,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
       text: existingEvent?.description ?? '',
     );
 
-    // startDate — дата начала
     DateTime startDate =
         existingEvent?.eventDate ?? (_selectedDay ?? DateTime.now());
-    // endDate — дата завершения (может быть null)
     DateTime? endDate = existingEvent?.endDate;
-
-    // ── ПАТЧ 2: время начала / завершения ──
     String? startTime = existingEvent?.startTime;
     String? endTime = existingEvent?.endTime;
-
     String selectedType =
         existingEvent?.type ?? AppConstants.eventTypeContest;
 
@@ -527,15 +805,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       const SizedBox(height: 10),
                       const Text(
                         'Тип мероприятия:',
-                        style: TextStyle(
-                            fontSize: 13, color: Colors.grey),
+                        style:
+                        TextStyle(fontSize: 13, color: Colors.grey),
                       ),
                       const SizedBox(height: 6),
                       Wrap(
                         spacing: 6,
                         runSpacing: 6,
-                        children: AppConstants
-                            .eventTypeNames.entries
+                        children: AppConstants.eventTypeNames.entries
                             .map((entry) {
                           final isSelected =
                               selectedType == entry.key;
@@ -578,8 +855,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       // Дата начала
                       const Text(
                         'Дата начала:',
-                        style: TextStyle(
-                            fontSize: 13, color: Colors.grey),
+                        style:
+                        TextStyle(fontSize: 13, color: Colors.grey),
                       ),
                       const SizedBox(height: 4),
                       InkWell(
@@ -621,14 +898,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 8),
 
-                      // ── ПАТЧ 2: Время начала ──
+                      // Время начала
                       const Text(
                         'Время начала (необязательно):',
-                        style: TextStyle(
-                            fontSize: 13, color: Colors.grey),
+                        style:
+                        TextStyle(fontSize: 13, color: Colors.grey),
                       ),
                       const SizedBox(height: 4),
                       InkWell(
@@ -680,14 +956,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 8),
 
                       // Дата завершения
                       const Text(
                         'Дата завершения (необязательно):',
-                        style: TextStyle(
-                            fontSize: 13, color: Colors.grey),
+                        style:
+                        TextStyle(fontSize: 13, color: Colors.grey),
                       ),
                       const SizedBox(height: 4),
                       InkWell(
@@ -745,14 +1020,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 8),
 
-                      // ── ПАТЧ 2: Время завершения ──
+                      // Время завершения
                       const Text(
                         'Время завершения (необязательно):',
-                        style: TextStyle(
-                            fontSize: 13, color: Colors.grey),
+                        style:
+                        TextStyle(fontSize: 13, color: Colors.grey),
                       ),
                       const SizedBox(height: 4),
                       InkWell(
@@ -804,7 +1078,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 4),
                     ],
                   ),
@@ -834,9 +1107,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         description: descController.text.trim(),
                         eventDate: startDate,
                         endDate: endDate,
-                        startTime: startTime,   // ← НОВОЕ
-                        endTime: endTime,        // ← НОВОЕ
+                        startTime: startTime,
+                        endTime: endTime,
                         type: selectedType,
+                        linkedProjectIds:
+                        existingEvent.linkedProjectIds,
                         createdBy: existingEvent.createdBy,
                       );
                       await _eventService.updateEvent(updated);
@@ -847,14 +1122,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         description: descController.text.trim(),
                         eventDate: startDate,
                         endDate: endDate,
-                        startTime: startTime,   // ← НОВОЕ
-                        endTime: endTime,        // ← НОВОЕ
+                        startTime: startTime,
+                        endTime: endTime,
                         type: selectedType,
                         createdBy: user?.id ?? '',
                       );
                       await _eventService.createEvent(event);
                     }
-
                     if (context.mounted) Navigator.pop(context);
                     _loadEvents();
                   },
@@ -886,8 +1160,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               await _eventService.deleteEvent(event.id);
               _loadEvents();
             },
-            style:
-            TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Удалить'),
           ),
         ],
@@ -944,9 +1217,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AppState>().currentUser;
-    final isAdminOrTeacher =
-        user?.role == AppConstants.roleAdmin ||
-            user?.role == AppConstants.roleTeacher;
+    final isAdminOrTeacher = user?.role == AppConstants.roleAdmin ||
+        user?.role == AppConstants.roleTeacher;
     final isAdmin = user?.role == AppConstants.roleAdmin;
 
     return Scaffold(
@@ -991,15 +1263,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 8, vertical: 6),
                   child: Row(
-                    children: [
-                      'Пн',
-                      'Вт',
-                      'Ср',
-                      'Чт',
-                      'Пт',
-                      'Сб',
-                      'Вс'
-                    ]
+                    children: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
                         .map((day) => Expanded(
                       child: Center(
                         child: Text(
@@ -1007,8 +1271,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
-                            color: (day == 'Сб' ||
-                                day == 'Вс')
+                            color: (day == 'Сб' || day == 'Вс')
                                 ? Colors.red.shade300
                                 : Colors.grey.shade600,
                           ),
@@ -1022,14 +1285,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ],
             ),
           ),
-
           const Divider(height: 1),
 
           // Список мероприятий
           Expanded(
             child: _isLoading
-                ? const Center(
-                child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator())
                 : _buildEventsList(isAdminOrTeacher, isAdmin),
           ),
         ],
@@ -1053,7 +1314,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final daysInMonth = DateTime(
         _currentMonth.year, _currentMonth.month + 1, 0)
         .day;
-
     final today = DateTime.now();
 
     final List<Widget> dayCells = [];
@@ -1065,15 +1325,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
     for (int day = 1; day <= daysInMonth; day++) {
       final date = DateTime(
           _currentMonth.year, _currentMonth.month, day);
-      final isToday = today.year == date.year &&
-          today.month == date.month &&
-          today.day == date.day;
+      final isToday = date.year == today.year &&
+          date.month == today.month &&
+          date.day == today.day;
       final isSelected = _selectedDay != null &&
-          _selectedDay!.year == date.year &&
-          _selectedDay!.month == date.month &&
-          _selectedDay!.day == date.day;
+          date.year == _selectedDay!.year &&
+          date.month == _selectedDay!.month &&
+          date.day == _selectedDay!.day;
       final dayEvents = _eventsForDay(date);
-      final hasEvents = dayEvents.isNotEmpty;
 
       dayCells.add(
         GestureDetector(
@@ -1083,7 +1342,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
             });
           },
           child: Container(
-            // ── ПАТЧ 1: уменьшен margin для ячеек ──
             margin: const EdgeInsets.all(2),
             decoration: BoxDecoration(
               color: isSelected
@@ -1091,7 +1349,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   : isToday
                   ? const Color(0xFF1565C0).withOpacity(0.1)
                   : Colors.transparent,
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(8),
+              border: isToday && !isSelected
+                  ? Border.all(
+                  color: const Color(0xFF1565C0), width: 1)
+                  : null,
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1099,36 +1361,35 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 Text(
                   '$day',
                   style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: isToday || isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
                     color: isSelected
                         ? Colors.white
                         : isToday
                         ? const Color(0xFF1565C0)
                         : Colors.black87,
+                    fontWeight: isToday || isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    fontSize: 14,
                   ),
                 ),
-                if (hasEvents)
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    children: dayEvents
-                        .take(3)
-                        .map((e) => Container(
-                      width: 4,
-                      height: 4,
-                      margin: const EdgeInsets.only(
-                          top: 1, left: 1, right: 1),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? Colors.white
-                            : _eventColor(e.type),
-                        shape: BoxShape.circle,
-                      ),
-                    ))
-                        .toList(),
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: dayEvents
+                      .take(3)
+                      .map((e) => Container(
+                    width: 4,
+                    height: 4,
+                    margin: const EdgeInsets.only(
+                        top: 1, left: 1, right: 1),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? Colors.white
+                          : _eventColor(e.type),
+                      shape: BoxShape.circle,
+                    ),
+                  ))
+                      .toList(),
+                ),
               ],
             ),
           ),
@@ -1140,17 +1401,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
       crossAxisCount: 7,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      // ── ПАТЧ 1: childAspectRatio увеличен с 1 до 1.3 ──
-      // Это делает ячейки менее высокими (шире, чем выше)
       childAspectRatio: 1.3,
-      padding: const EdgeInsets.symmetric(
-          horizontal: 4, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       children: dayCells,
     );
   }
 
-  Widget _buildEventsList(
-      bool isAdminOrTeacher, bool isAdmin) {
+  // ══════════════════════════════════════════════════════
+  // FIX 3: Переработанный список мероприятий в календаре
+  // Строка 1: Название
+  // Строка 2: Тип
+  // Строка 3: Начало, Время начала
+  // Строка 4: Завершение, Время завершения
+  // Строка 5: Описание
+  // ══════════════════════════════════════════════════════
+  Widget _buildEventsList(bool isAdminOrTeacher, bool isAdmin) {
     final List<EventModel> displayEvents;
     String headerText;
 
@@ -1166,7 +1431,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── ПАТЧ 5: заголовок + кнопка «Все мероприятия месяца» ──
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Row(
@@ -1178,8 +1442,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       fontWeight: FontWeight.bold, fontSize: 14),
                 ),
               ),
-              // Показываем кнопку «Все мероприятия месяца»
-              // только когда выбран конкретный день
               if (_selectedDay != null)
                 GestureDetector(
                   onTap: () {
@@ -1207,7 +1469,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ],
           ),
         ),
-
         if (displayEvents.isEmpty)
           const Expanded(
             child: Center(
@@ -1226,8 +1487,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         else
           Expanded(
             child: ListView.separated(
-              padding:
-              const EdgeInsets.fromLTRB(12, 0, 12, 80),
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
               itemCount: displayEvents.length,
               separatorBuilder: (_, __) =>
               const SizedBox(height: 4),
@@ -1242,123 +1502,199 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
-                    side:
-                    BorderSide(color: Colors.grey.shade200),
+                    side: BorderSide(color: Colors.grey.shade200),
                   ),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(10),
                     onTap: () => _openEventDetail(
                         event, isAdminOrTeacher, isAdmin),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor:
-                        color.withOpacity(0.15),
-                        child: Icon(
-                          _eventIcon(event.type),
-                          color: color,
-                          size: 20,
-                        ),
-                      ),
-                      title: Text(
-                        event.title,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: Column(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      child: Row(
                         crossAxisAlignment:
                         CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            typeName,
-                            style: TextStyle(
-                              color: color,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.play_circle_outline,
-                                size: 12,
-                                color: Colors.grey,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                _dateFormat
-                                    .format(event.eventDate),
-                                style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey),
-                              ),
-                              // Показываем время начала
-                              if (event.startTime != null &&
-                                  event.startTime!
-                                      .isNotEmpty) ...[
-                                const SizedBox(width: 4),
-                                const Icon(
-                                  Icons.access_time_outlined,
-                                  size: 12,
-                                  color: Colors.grey,
-                                ),
-                                const SizedBox(width: 2),
-                                Text(
-                                  event.startTime!,
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey),
-                                ),
-                              ],
-                              // Показываем дату завершения
-                              if (event.endDate != null) ...[
-                                const SizedBox(width: 8),
-                                const Icon(
-                                  Icons
-                                      .stop_circle_outlined,
-                                  size: 12,
-                                  color: Colors.grey,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _dateFormat.format(
-                                      event.endDate!),
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey),
-                                ),
-                              ],
-                            ],
-                          ),
-                          if (event.description.isNotEmpty)
-                            Text(
-                              event.description,
-                              style: const TextStyle(
-                                  fontSize: 12),
-                              maxLines: 1,
-                              overflow:
-                              TextOverflow.ellipsis,
-                            ),
-                        ],
-                      ),
-                      isThreeLine: true,
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isAdmin)
-                            IconButton(
-                              icon: const Icon(
-                                Icons.delete_outline,
-                                color: Colors.red,
+                          // Иконка слева
+                          Padding(
+                            padding:
+                            const EdgeInsets.only(top: 2),
+                            child: CircleAvatar(
+                              backgroundColor:
+                              color.withOpacity(0.15),
+                              radius: 20,
+                              child: Icon(
+                                _eventIcon(event.type),
+                                color: color,
                                 size: 20,
                               ),
-                              tooltip: 'Удалить',
-                              onPressed: () =>
-                                  _deleteEvent(event),
                             ),
-                          const Icon(
-                            Icons.chevron_right,
-                            color: Colors.grey,
-                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          // Контент по центру
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                              children: [
+                                // Строка 1: Название
+                                Text(
+                                  event.title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                  maxLines: 2,
+                                  overflow:
+                                  TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 3),
+                                // Строка 2: Тип
+                                Text(
+                                  typeName,
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                // Строка 3: Начало, Время начала
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons
+                                          .play_circle_outline,
+                                      size: 12,
+                                      color: Colors.grey,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _dateFormat.format(
+                                          event.eventDate),
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey),
+                                    ),
+                                    if (event.startTime !=
+                                        null &&
+                                        event.startTime!
+                                            .isNotEmpty) ...[
+                                      const SizedBox(width: 8),
+                                      const Icon(
+                                        Icons
+                                            .access_time_outlined,
+                                        size: 12,
+                                        color: Colors.grey,
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        event.startTime!,
+                                        style: const TextStyle(
+                                            fontSize: 12,
+                                            color:
+                                            Colors.grey),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                // Строка 4: Завершение, Время завершения
+                                if (event.endDate != null ||
+                                    (event.endTime != null &&
+                                        event.endTime!
+                                            .isNotEmpty)) ...[
+                                  const SizedBox(height: 2),
+                                  Row(
+                                    children: [
+                                      if (event.endDate !=
+                                          null) ...[
+                                        const Icon(
+                                          Icons
+                                              .stop_circle_outlined,
+                                          size: 12,
+                                          color: Colors.grey,
+                                        ),
+                                        const SizedBox(
+                                            width: 4),
+                                        Text(
+                                          _dateFormat.format(
+                                              event.endDate!),
+                                          style:
+                                          const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors
+                                                  .grey),
+                                        ),
+                                      ],
+                                      if (event.endTime !=
+                                          null &&
+                                          event.endTime!
+                                              .isNotEmpty) ...[
+                                        const SizedBox(
+                                            width: 8),
+                                        const Icon(
+                                          Icons
+                                              .access_time_filled_outlined,
+                                          size: 12,
+                                          color: Colors.grey,
+                                        ),
+                                        const SizedBox(
+                                            width: 2),
+                                        Text(
+                                          event.endTime!,
+                                          style:
+                                          const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors
+                                                  .grey),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ],
+                                // Строка 5: Описание
+                                if (event.description
+                                    .isNotEmpty) ...[
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    event.description,
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.black54),
+                                    maxLines: 1,
+                                    overflow:
+                                    TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          // Кнопки справа
+                          Column(
+                            mainAxisAlignment:
+                            MainAxisAlignment.start,
+                            children: [
+                              if (isAdmin)
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: Colors.red,
+                                    size: 20,
+                                  ),
+                                  tooltip: 'Удалить',
+                                  onPressed: () =>
+                                      _deleteEvent(event),
+                                  constraints:
+                                  const BoxConstraints(),
+                                  padding:
+                                  const EdgeInsets.all(4),
+                                ),
+                              const Icon(
+                                Icons.chevron_right,
+                                color: Colors.grey,
+                                size: 20,
+                              ),
+                            ],
                           ),
                         ],
                       ),

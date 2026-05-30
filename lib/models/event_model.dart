@@ -2,12 +2,13 @@ class EventModel {
   final String id;
   final String title;
   final String description;
-  final DateTime eventDate;     // дата начала
-  final DateTime? endDate;      // дата завершения
-  final String? startTime;      // ← НОВОЕ: время начала (формат "HH:mm")
-  final String? endTime;        // ← НОВОЕ: время завершения (формат "HH:mm")
-  final String type;            // olympiad, contest, defense, trip, other
-  final String? linkedProjectId;
+  final DateTime eventDate;       // дата начала
+  final DateTime? endDate;        // дата завершения
+  final String? startTime;        // время начала (формат "HH:mm")
+  final String? endTime;          // время завершения (формат "HH:mm")
+  final String type;              // olympiad, contest, defense, trip, other
+  final String? linkedProjectId;  // (оставлено для обратной совместимости)
+  final List<String> linkedProjectIds; // ← НОВОЕ: список привязанных проектов
   final String createdBy;
 
   EventModel({
@@ -16,14 +17,25 @@ class EventModel {
     required this.description,
     required this.eventDate,
     this.endDate,
-    this.startTime,              // ← НОВОЕ
-    this.endTime,                // ← НОВОЕ
+    this.startTime,
+    this.endTime,
     required this.type,
     this.linkedProjectId,
+    this.linkedProjectIds = const [],
     required this.createdBy,
   });
 
   factory EventModel.fromMap(Map<String, dynamic> map, String id) {
+    // Обратная совместимость: если есть старое поле linkedProjectId,
+    // но нет нового linkedProjectIds — берём из старого
+    List<String> projectIds = [];
+    if (map['linkedProjectIds'] != null) {
+      projectIds = List<String>.from(map['linkedProjectIds']);
+    } else if (map['linkedProjectId'] != null &&
+        (map['linkedProjectId'] as String).isNotEmpty) {
+      projectIds = [map['linkedProjectId']];
+    }
+
     return EventModel(
       id: id,
       title: map['title'] ?? '',
@@ -31,13 +43,13 @@ class EventModel {
       eventDate: map['eventDate'] != null
           ? DateTime.parse(map['eventDate'])
           : DateTime.now(),
-      endDate: map['endDate'] != null
-          ? DateTime.parse(map['endDate'])
-          : null,
-      startTime: map['startTime'],   // ← НОВОЕ
-      endTime: map['endTime'],       // ← НОВОЕ
+      endDate:
+      map['endDate'] != null ? DateTime.parse(map['endDate']) : null,
+      startTime: map['startTime'],
+      endTime: map['endTime'],
       type: map['type'] ?? 'other',
       linkedProjectId: map['linkedProjectId'],
+      linkedProjectIds: projectIds,
       createdBy: map['createdBy'] ?? '',
     );
   }
@@ -48,11 +60,41 @@ class EventModel {
       'description': description,
       'eventDate': eventDate.toIso8601String(),
       'endDate': endDate?.toIso8601String(),
-      'startTime': startTime,        // ← НОВОЕ
-      'endTime': endTime,            // ← НОВОЕ
+      'startTime': startTime,
+      'endTime': endTime,
       'type': type,
       'linkedProjectId': linkedProjectId,
+      'linkedProjectIds': linkedProjectIds,
       'createdBy': createdBy,
     };
+  }
+
+  /// Создать копию с изменёнными полями
+  EventModel copyWith({
+    String? id,
+    String? title,
+    String? description,
+    DateTime? eventDate,
+    DateTime? endDate,
+    String? startTime,
+    String? endTime,
+    String? type,
+    String? linkedProjectId,
+    List<String>? linkedProjectIds,
+    String? createdBy,
+  }) {
+    return EventModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      eventDate: eventDate ?? this.eventDate,
+      endDate: endDate ?? this.endDate,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      type: type ?? this.type,
+      linkedProjectId: linkedProjectId ?? this.linkedProjectId,
+      linkedProjectIds: linkedProjectIds ?? this.linkedProjectIds,
+      createdBy: createdBy ?? this.createdBy,
+    );
   }
 }
