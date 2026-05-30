@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-
 import '../../app_state.dart';
 import '../../models/project_model.dart';
 import '../../services/project_service.dart';
@@ -41,6 +40,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 
   void _changeStatus() {
     if (_project == null) return;
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -77,9 +77,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                     isSelected
                         ? Icons.radio_button_checked
                         : Icons.radio_button_off,
-                    color: isSelected
-                        ? const Color(0xFF1565C0)
-                        : Colors.grey,
+                    color:
+                    isSelected ? const Color(0xFF1565C0) : Colors.grey,
                   ),
                   title: Text(
                     entry.value,
@@ -163,8 +162,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     // ══════════════════════════════════════════════════
     // ИЗМЕНЕНО: Права доступа с учётом владения проектом
     // Админ — может всё
-    // Руководитель — может редактировать ТОЛЬКО свои проекты
-    //   (где supervisorId совпадает с userId)
+    // Руководитель — может редактировать И УДАЛЯТЬ ТОЛЬКО свои проекты
+    //                (где supervisorId совпадает с userId)
     // Ученик — только просмотр
     // ══════════════════════════════════════════════════
     bool canEdit;
@@ -176,10 +175,10 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
       canDelete = true;
       canUploadFiles = true;
     } else if (role == AppConstants.roleTeacher) {
-      // Руководитель может редактировать только СВОИ проекты
+      // Руководитель может редактировать и удалять только СВОИ проекты
       final isOwner = _project != null && _project!.supervisorId == userId;
       canEdit = isOwner;
-      canDelete = false; // удалять может только админ
+      canDelete = isOwner; // ← ИЗМЕНЕНО: было false, теперь isOwner
       canUploadFiles = isOwner;
     } else {
       canEdit = false;
@@ -262,8 +261,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                       decoration: BoxDecoration(
                         color: statusColor.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: statusColor.withOpacity(0.4)),
+                        border:
+                        Border.all(color: statusColor.withOpacity(0.4)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -299,6 +298,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                   ),
                 ],
               ),
+
               const SizedBox(height: 14),
 
               // ── НАЗВАНИЕ ─────────────────────────────
@@ -311,6 +311,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 ),
               ),
               const SizedBox(height: 8),
+
               if (p.shortDescription.isNotEmpty)
                 Text(
                   p.shortDescription,
@@ -320,6 +321,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                     height: 1.4,
                   ),
                 ),
+
               const SizedBox(height: 20),
 
               // ── ИНФОРМАЦИОННЫЙ БЛОК ───────────────────
@@ -352,6 +354,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                   ),
                 ],
               ]),
+
               const SizedBox(height: 20),
 
               // ── ПОЛНОЕ ОПИСАНИЕ ───────────────────────
@@ -369,7 +372,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 const SizedBox(height: 20),
               ],
 
-              // ── УЧАСТНИКИ ─────────────────────────────
+              // ── УЧАСТНИКИ ────────────────────────────
               _sectionTitle('Участники (${p.participants.length})'),
               const SizedBox(height: 8),
               if (p.participants.isEmpty)
@@ -431,6 +434,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                     }),
                   ),
                 ),
+
               const SizedBox(height: 20),
 
               // ── РЕЗУЛЬТАТЫ ────────────────────────────
@@ -454,7 +458,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 const SizedBox(height: 20),
               ],
 
-              // ── НАГРАДЫ ───────────────────────────────
+              // ── НАГРАДЫ ──────────────────────────────
               if (p.awards.isNotEmpty) ...[
                 _sectionTitle('Достижения и награды'),
                 const SizedBox(height: 8),
@@ -485,7 +489,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                 const SizedBox(height: 20),
               ],
 
-              // ── ФАЙЛЫ ─────────────────────────────────
+              // ── ФАЙЛЫ ────────────────────────────────
               ProjectFilesWidget(
                 projectId: p.id,
                 currentUserId: currentUser?.id ?? '',
@@ -565,7 +569,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
             width: 120,
             child: Text(
               label,
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+              style:
+              TextStyle(color: Colors.grey.shade600, fontSize: 13),
             ),
           ),
           Expanded(
