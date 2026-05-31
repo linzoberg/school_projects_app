@@ -1,4 +1,4 @@
-# ПроектУМ (project PUMA)
+# ПроектУМ (projectum)
 
 [![Version](https://img.shields.io/badge/Version-1.18-blue)](#)
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)](#)
